@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SaveLYF">
+<meta name="theme-color" content="#1C1C1E" id="theme-meta">
+<meta name="description" content="GPS pothole alerts and road safety for Botswana drivers">
+<title>SaveLYF – Smart Road Safety</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<!-- ════════════════════════════════════════════════════
+     FREE FIREBASE SDK — Spark Plan (No cost)
+     https://console.firebase.google.com → free account
+     ════════════════════════════════════════════════════ -->
+<!--
+  ⚠ SECURITY: Firebase credentials are loaded from config.js
+  Add config.js to your .gitignore — never commit it to source control.
+-->
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<style>
+/* ═════════════════════════════════════════════
+   DESIGN SYSTEM
+   Font: Space Grotesk + Space Mono
+   Palette: Dark urban · brand blue · danger red
+   ═════════════════════════════════════════════ */
+:root {
+  --brand:      #2979FF;
+  --brand-glow: rgba(41,121,255,.45);
+  --accent:     #00E676;
+  --danger:     #FF1744;
+  --danger-glow:rgba(255,23,68,.50);
+  --warn:       #FFB300;
+  --warn-glow:  rgba(255,179,0,.40);
+  --safe:       #00C853;
+  --safe-glow:  rgba(0,200,83,.35);
+  --fixed:      #2962FF;
+  --purple:     #AA00FF;
+
+  /* Night (default) */
+  --bg:         #0F0F11;
+  --bg-card:    #1C1C1F;
+  --bg-card2:   #242428;
+  --bg-raised:  #2C2C30;
+  --glass:      rgba(28,28,31,.88);
+  --border:     rgba(255,255,255,.07);
+  --border-hi:  rgba(255,255,255,.16);
+  --tx:         #F0F0F2;
+  --tx-2:       #9D9DA5;
+  --tx-3:       #4E4E58;
+  --shadow:     0 8px 32px rgba(0,0,0,.7);
+  --shadow-lg:  0 20px 60px rgba(0,0,0,.85);
+
+  --r-sm:  8px;   --r-md:  14px;
+  --r-lg:  20px;  --r-xl:  28px;
+  --r-pill:999px;
+  --font:  'Space Grotesk', system-ui, sans-serif;
+  --mono:  'Space Mono', 'Courier New', monospace;
+}
+[data-theme="day"] {
+  --bg:        #F0EDE6;
+  --bg-card:   #FFFFFF;
+  --bg-card2:  #F5F4F0;
+  --bg-raised: #ECEAE4;
+  --glass:     rgba(255,255,255,.90);
+  --border:    rgba(0,0,0,.07);
+  --border-hi: rgba(0,0,0,.15);
+  --tx:        #18181C;
+  --tx-2:      #55555F;
+  --tx-3:      #A8A8B0;
+  --shadow:    0 4px 20px rgba(0,0,0,.12);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,.18);
+}
+
+/* ─── RESET ─── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);overflow:hidden;-webkit-font-smoothing:antialiased;transition:background .4s,color .4s}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:var(--font);outline:none}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
+
+/* ─── APP SHELL ─── */
+#shell{display:flex;flex-direction:column;height:100dvh;height:100vh;position:relative}
+#status{height:26px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0;z-index:10;transition:background .4s}
+.st-time{font-size:11.5px;font-weight:700;font-family:var(--mono);color:var(--tx)}
+.st-right{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tx-2);font-family:var(--mono)}
+.st-gps{font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.5px}
+
+/* ─── PAGES ─── */
+#pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;display:none;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.page.active{display:block;animation:pgIn .26s cubic-bezier(.34,1,.64,1)}
+@keyframes pgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── BOTTOM NAV ─── */
+#nav{height:62px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;flex-shrink:0;z-index:100;padding-bottom:env(safe-area-inset-bottom,0);transition:background .4s}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 14px;border-radius:var(--r-md);cursor:pointer;transition:all .2s;position:relative;min-width:54px}
+.ni .ic{font-size:21px;transition:transform .2s;filter:grayscale(.3) opacity(.5)}
+.ni .lb{font-size:9.5px;font-weight:700;color:var(--tx-3);letter-spacing:.3px;transition:color .2s}
+.ni.active .ic{filter:none;transform:scale(1.08)}
+.ni.active .lb{color:var(--brand)}
+.ni.active::after{content:'';position:absolute;bottom:5px;width:18px;height:3px;background:var(--brand);border-radius:2px;box-shadow:0 0 8px var(--brand-glow)}
+.ni-badge{position:absolute;top:4px;right:9px;width:7px;height:7px;background:var(--danger);border-radius:50%;border:2px solid var(--bg);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─── COMMON COMPONENTS ─── */
+.ph{padding:16px 16px 6px;display:flex;align-items:flex-start;justify-content:space-between}
+.pt{font-size:21px;font-weight:700;letter-spacing:-.4px}
+.ps{font-size:12px;color:var(--tx-2);margin-top:2px}
+.card{background:var(--bg-card);border-radius:var(--r-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow);transition:background .4s,border-color .4s}
+.ch{padding:13px 15px 9px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ct{font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--tx-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:var(--r-md);font-family:var(--font);font-weight:700;font-size:13px;letter-spacing:.2px;padding:10px 18px;transition:all .2s;cursor:pointer;border:none}
+.btn:active{transform:scale(.95)}
+.btn-brand{background:var(--brand);color:#fff;box-shadow:0 4px 16px var(--brand-glow)}
+.btn-danger{background:var(--danger);color:#fff;box-shadow:0 4px 16px var(--danger-glow)}
+.btn-safe{background:var(--safe);color:#fff;box-shadow:0 4px 14px var(--safe-glow)}
+.btn-warn{background:var(--warn);color:#000}
+.btn-ghost{background:var(--bg-raised);color:var(--tx);border:1px solid var(--border-hi)}
+.btn-lg{padding:14px 24px;font-size:15px;border-radius:var(--r-lg)}
+.btn-sm{padding:6px 12px;font-size:11px;border-radius:var(--r-sm)}
+.btn-pill{border-radius:var(--r-pill)}
+.btn-full{width:100%}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:var(--r-pill);font-size:10.5px;font-weight:700;letter-spacing:.4px}
+.tag-danger{background:rgba(255,23,68,.14);color:var(--danger)}
+.tag-warn{background:rgba(255,179,0,.14);color:var(--warn)}
+.tag-safe{background:rgba(0,200,83,.12);color:var(--safe)}
+.tag-brand{background:rgba(41,121,255,.13);color:var(--brand)}
+.tag-fixed{background:rgba(41,98,255,.13);color:var(--fixed)}
+.p16{padding:16px}.px16{padding-left:16px;padding-right:16px}
+.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.mb16{margin-bottom:16px}.mb20{margin-bottom:20px}
+.row{display:flex;align-items:center}
+.spacer{flex:1}
+.divider{height:1px;background:var(--border);margin:0 16px}
+
+/* ─── SPLASH SCREEN ─── */
+#splash{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#splash.hide{opacity:0;pointer-events:none}
+.splash-logo{font-size:72px;animation:logoIn .6s cubic-bezier(.34,1.6,.64,1)}
+.splash-name{font-size:30px;font-weight:700;margin-top:12px;letter-spacing:-1px}
+.splash-tag{font-size:13px;color:var(--tx-2);margin-top:4px}
+.splash-bar{width:200px;height:3px;background:var(--bg-raised);border-radius:2px;margin-top:32px;overflow:hidden}
+.splash-fill{height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--accent));border-radius:2px;animation:fill 1.8s ease forwards}
+@keyframes logoIn{from{transform:scale(.4) rotate(-20deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+@keyframes fill{0%{width:0}40%{width:40%}100%{width:100%}}
+
+/* ─── FIREBASE CONFIG BANNER ─── */
+#fb-banner{position:fixed;bottom:80px;left:12px;right:12px;z-index:5000;background:rgba(255,179,0,.12);border:1px solid rgba(255,179,0,.3);border-radius:var(--r-lg);padding:12px 16px;display:none;animation:pgIn .3s ease}
+#fb-banner.show{display:flex;align-items:flex-start;gap:10px}
+.fbb-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.fbb-text{flex:1}
+.fbb-title{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:2px}
+.fbb-sub{font-size:11px;color:var(--tx-2);line-height:1.4}
+.fbb-close{font-size:14px;color:var(--tx-2);cursor:pointer;padding:2px;flex-shrink:0}
+
+/* ─── THEME TOGGLE ─── */
+#theme-btn{position:fixed;bottom:78px;right:12px;z-index:4000;width:42px;height:42px;border-radius:var(--r-md);background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--border-hi);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow);transition:all .3s}
+
+/* ─── INSTALL BANNER ─── */
+#install-bar{position:fixed;top:26px;left:0;right:0;z-index:4500;background:var(--brand);padding:10px 16px;display:none;align-items:center;gap:10px;box-shadow:0 4px 20px var(--brand-glow)}
+#install-bar.show{display:flex}
+.ib-text{flex:1;font-size:12px;font-weight:600;color:#fff}
+.ib-btn{padding:5px 12px;border-radius:var(--r-sm);background:rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:var(--font)}
+.ib-close{color:rgba(255,255,255,.7);font-size:16px;cursor:pointer;background:none;border:none}
+
+/* ════════════════════════════════════════════
+   PAGE 1 — DASHBOARD (MAP)
+   ════════════════════════════════════════════ */
+#pg-dashboard{background:var(--bg);position:relative}
+.map-wrap{position:relative;width:100%;height:calc(100dvh - 88px);min-height:280px;overflow:hidden}
+#leafmap{position:absolute;inset:0;z-index:1}
+
+/* Floating top bar */
+.map-topbar{position:absolute;top:12px;left:12px;right:12px;z-index:800;display:flex;align-items:center;gap:8px;pointer-events:none}
+.road-pill{flex:1;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:9px 14px;display:flex;align-items:center;gap:10px;pointer-events:all;box-shadow:var(--shadow)}
+.rp-icon{font-size:18px}
+.rp-name{font-size:13px;font-weight:700;color:var(--tx)}
+.rp-dist{font-size:11px;color:var(--tx-2);margin-top:1px}
+.map-ctrl{width:40px;height:40px;border-radius:var(--r-md);background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border-hi);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:all;box-shadow:var(--shadow);transition:all .2s;color:var(--tx);flex-shrink:0}
+.map-ctrl:active{transform:scale(.93)}
+
+/* Right controls */
+.map-rightbar{position:absolute;right:12px;top:72px;z-index:800;display:flex;flex-direction:column;gap:8px}
+
+/* Legend */
+.map-legend{position:absolute;left:12px;top:72px;z-index:800;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:12px;box-shadow:var(--shadow);display:none;transition:background .4s}
+.map-legend.show{display:block;animation:pgIn .2s ease}
+.leg-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-size:11.5px;font-weight:600;color:var(--tx-2)}
+.leg-row:last-child{margin-bottom:0}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Alert slide */
+.alert-slide{position:absolute;bottom:70px;left:10px;right:10px;z-index:810;border-radius:var(--r-lg);padding:12px 14px;display:none;pointer-events:all;box-shadow:var(--shadow-lg)}
+.alert-slide.show{display:flex;align-items:center;gap:12px;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.alert-danger-bg{background:rgba(255,23,68,.15);border:1px solid rgba(255,23,68,.4)}
+.alert-warn-bg{background:rgba(255,179,0,.13);border:1px solid rgba(255,179,0,.35)}
+.alert-icon{font-size:28px;flex-shrink:0}
+.alert-body{flex:1}
+.alert-title{font-size:13.5px;font-weight:800;letter-spacing:.3px}
+.alert-sub{font-size:11px;color:var(--tx-2);margin-top:2px}
+.alert-close{font-size:14px;color:var(--tx-2);cursor:pointer;background:none;border:none;flex-shrink:0;font-size:18px}
+
+/* Bottom speed panel */
+.map-footer{position:absolute;bottom:8px;left:10px;right:10px;z-index:800}
+.spd-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow)}
+.spd-block{text-align:center;min-width:60px}
+.spd-num{font-size:38px;font-weight:700;font-family:var(--mono);line-height:1;transition:color .4s}
+.spd-unit{font-size:10px;font-weight:700;color:var(--tx-3);letter-spacing:1px}
+.spd-safe{color:var(--safe)}
+.spd-warn{color:var(--warn)}
+.spd-danger{color:var(--danger)}
+.spd-div{width:1px;height:42px;background:var(--border-hi)}
+.spd-info{flex:1}
+.spd-road{font-size:13px;font-weight:700;margin-bottom:3px}
+.spd-hazard{font-size:11px;color:var(--tx-2)}
+.spd-tag{margin-top:4px}
+.voice-btn{width:42px;height:42px;border-radius:var(--r-md);background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:none;box-shadow:0 4px 14px var(--brand-glow);transition:all .3s;flex-shrink:0}
+.voice-btn.muted{background:var(--bg-raised);box-shadow:none}
+.voice-btn.speaking{animation:voicePulse 1s infinite}
+@keyframes voicePulse{0%,100%{box-shadow:0 4px 14px var(--brand-glow)}50%{box-shadow:0 0 0 12px rgba(41,121,255,.1),0 4px 14px var(--brand-glow)}}
+
+/* FAB */
+.fab{position:absolute;right:14px;bottom:96px;z-index:820;width:52px;height:52px;border-radius:var(--r-xl);background:var(--danger);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;border:none;box-shadow:0 6px 24px var(--danger-glow);transition:all .3s}
+.fab:active{transform:scale(.92)}
+
+/* GPS accuracy indicator */
+.gps-pill{position:absolute;top:62px;left:12px;z-index:800;background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--border-hi);border-radius:var(--r-pill);padding:4px 10px;display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--tx-2);box-shadow:var(--shadow)}
+.gps-dot{width:7px;height:7px;border-radius:50%;background:var(--tx-3);flex-shrink:0;transition:background .4s}
+.gps-dot.active{background:var(--accent);animation:blink 2s infinite}
+.gps-dot.searching{background:var(--warn);animation:blink .8s infinite}
+
+/* Map tooltip */
+.mtt{position:absolute;z-index:850;background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:12px 14px;min-width:200px;max-width:250px;box-shadow:var(--shadow-lg);display:none;pointer-events:all}
+.mtt.show{display:block;animation:pgIn .2s ease}
+.mtt-road{font-size:13px;font-weight:800;margin-bottom:4px}
+.mtt-det{font-size:11.5px;color:var(--tx-2);line-height:1.55}
+.mtt-btns{display:flex;gap:6px;margin-top:9px}
+.mtt-btn{flex:1;padding:6px;border-radius:var(--r-sm);font-size:10.5px;font-weight:700;text-align:center;cursor:pointer;background:var(--bg-raised);color:var(--tx);border:1px solid var(--border-hi);font-family:var(--font);transition:all .2s}
+.mtt-btn:active{transform:scale(.94)}
+
+/* Leaflet overrides */
+.leaflet-control-attribution{font-size:8px!important;background:var(--glass)!important;color:var(--tx-2)!important;backdrop-filter:blur(8px)}
+.leaflet-control-attribution a{color:var(--brand)!important}
+.leaflet-container{font-family:var(--font)}
+
+/* Custom markers */
+.lm-pin{position:relative;width:32px;height:40px;cursor:pointer;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+.lm-head{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;position:relative;z-index:2;border:2px solid rgba(255,255,255,.3)}
+.lm-head::after{content:attr(data-glyph);transform:rotate(45deg);display:block}
+.lm-ring{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;border:2px solid currentColor;animation:pinRing 2.2s infinite;pointer-events:none}
+@keyframes pinRing{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+.lm-danger  .lm-head{background:#FF1744;color:#FF1744}
+.lm-moderate .lm-head{background:#FFB300;color:#FFB300}
+.lm-low     .lm-head{background:#FF6F00;color:#FF6F00}
+.lm-fixed   .lm-head{background:#2962FF;color:#2962FF}
+.lm-user{position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center}
+.lm-udot{width:16px;height:16px;background:var(--brand);border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px var(--brand-glow);z-index:2;position:relative}
+.lm-uring{position:absolute;border-radius:50%;border:2px solid var(--brand);animation:uRing 2.4s infinite}
+.lm-uring.r2{animation-delay:1.2s}
+@keyframes uRing{0%{width:16px;height:16px;opacity:.6}100%{width:52px;height:52px;opacity:0}}
+.lm-acc{width:30px;height:30px;background:#AA00FF;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 3px 14px rgba(170,0,255,.55);animation:pinRing 2s infinite;border:2px solid rgba(255,255,255,.25);cursor:pointer}
+
+/* Overlay elements above map */
+.map-topbar,.map-rightbar,.map-legend,.alert-slide,.map-footer,.fab,.gps-pill,.mtt{z-index:800}
+
+/* ════════════════════════════════════════════
+   PAGE 2 — LIVE DRIVE
+   ════════════════════════════════════════════ */
+#pg-drive{background:linear-gradient(160deg,#0A0B0D 0%,#0F1318 60%,#0A0B0D 100%);min-height:100%;padding-bottom:20px}
+.drive-hero{padding:20px 16px 16px;text-align:center}
+.drive-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.drive-title{font-size:20px;font-weight:700;letter-spacing:-.4px}
+.drive-status{display:flex;align-items:center;gap:6px;background:rgba(0,200,83,.12);border:1px solid rgba(0,200,83,.3);border-radius:var(--r-pill);padding:5px 12px;font-size:11px;font-weight:700;color:var(--safe)}
+.drive-status-dot{width:6px;height:6px;border-radius:50%;background:var(--safe);animation:blink 1.2s infinite}
+
+/* Speedometer */
+.speedo-wrap{position:relative;width:240px;height:240px;margin:0 auto}
+.speedo-wrap svg{width:240px;height:240px}
+.speedo-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.speedo-num{font-size:60px;font-weight:700;font-family:var(--mono);line-height:1;transition:color .4s}
+.speedo-kmh{font-size:12px;font-weight:700;color:var(--tx-3);letter-spacing:1.5px}
+.speedo-status{font-size:12px;font-weight:700;margin-top:2px;transition:color .4s}
+
+/* Drive info cards */
+.drive-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 12px}
+.dc{background:rgba(255,255,255,.04);border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:14px 12px;text-align:center}
+.dc-icon{font-size:20px;margin-bottom:6px}
+.dc-val{font-size:24px;font-weight:800;font-family:var(--mono);line-height:1;margin-bottom:2px}
+.dc-lbl{font-size:10px;font-weight:700;color:var(--tx-3);letter-spacing:.5px}
+
+/* Danger meter */
+.danger-meter-card{margin:0 16px 12px;background:rgba(255,255,255,.04);border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:14px}
+.dm-label{font-size:11px;font-weight:700;color:var(--tx-3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
+.dm-track{position:relative;height:10px;background:linear-gradient(90deg,var(--safe) 0%,var(--warn) 50%,var(--danger) 100%);border-radius:5px;overflow:visible}
+.dm-needle{position:absolute;top:-4px;width:3px;height:18px;background:#fff;border-radius:2px;transform:translateX(-50%);transition:left .6s cubic-bezier(.34,1.2,.64,1);box-shadow:0 0 8px rgba(255,255,255,.5)}
+.dm-zones{display:flex;justify-content:space-between;margin-top:6px}
+.dm-zone{font-size:9.5px;font-weight:700;color:var(--tx-3)}
+
+/* Drive buttons */
+.drive-btns{display:flex;gap:10px;margin:0 16px 12px}
+
+/* Upcoming hazards list */
+.hazard-list{margin:0 16px}
+.hz-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.hz-item:last-child{border:none}
+.hz-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.hz-body{flex:1}
+.hz-road{font-size:13px;font-weight:700}
+.hz-dist{font-size:11px;color:var(--tx-2);margin-top:1px}
+.hz-sev{font-size:10px;font-weight:700}
+
+/* ════════════════════════════════════════════
+   PAGE 3 — INSIGHTS
+   ════════════════════════════════════════════ */
+#pg-insights{background:var(--bg);padding-bottom:24px}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 16px 12px}
+.mc{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 10px;text-align:center;box-shadow:var(--shadow)}
+.mc-em{font-size:22px;margin-bottom:6px}
+.mc-n{font-size:26px;font-weight:800;font-family:var(--mono);line-height:1;margin-bottom:2px}
+.mc-l{font-size:9.5px;font-weight:700;color:var(--tx-3);letter-spacing:.5px}
+.bar-row{display:flex;align-items:center;gap:8px;padding:5px 14px}
+.br-lbl{font-size:11.5px;font-weight:600;color:var(--tx-2);width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.br-track{flex:1;height:9px;background:var(--bg-card2);border-radius:5px;overflow:hidden}
+.br-fill{height:100%;border-radius:5px;transition:width 1.4s cubic-bezier(.16,1,.3,1)}
+.br-val{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--tx-2);width:28px;text-align:right}
+.act-wrap{padding:4px 14px 10px;display:flex;align-items:flex-end;gap:4px;height:78px}
+.act-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px;cursor:pointer;transition:opacity .2s}
+.act-bar:hover{opacity:.7}
+.act-labels{display:flex;gap:4px;padding:2px 14px 0}
+.act-lbl{flex:1;text-align:center;font-size:9px;color:var(--tx-3);font-family:var(--mono)}
+.risk-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.risk-table{width:100%;border-collapse:collapse;font-size:11.5px;min-width:460px}
+.risk-table th{padding:7px 13px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tx-3);border-bottom:1px solid var(--border)}
+.risk-table td{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.03)}
+[data-theme="day"] .risk-table td{border-bottom-color:rgba(0,0,0,.04)}
+.risk-table tr:last-child td{border:none}
+.risk-table tr:hover td{background:rgba(41,121,255,.04)}
+
+/* ════════════════════════════════════════════
+   PAGE 4 — PROFILE
+   ════════════════════════════════════════════ */
+#pg-profile{background:var(--bg);padding-bottom:24px}
+.p-hero{background:linear-gradient(175deg,var(--brand) 0%,#1565C0 100%);padding:22px 18px 28px;text-align:center;position:relative;overflow:hidden}
+.p-hero::before{content:'';position:absolute;inset:0;opacity:.06;background:url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='30' fill='white'/%3E%3C/svg%3E") repeat}
+.p-av{width:76px;height:76px;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 12px;position:relative;z-index:1}
+.p-name{font-size:19px;font-weight:800;color:#fff;margin-bottom:3px;position:relative;z-index:1}
+.p-mode{font-size:12px;color:rgba(255,255,255,.65);margin-bottom:14px;position:relative;z-index:1}
+.p-stats{display:flex;justify-content:center;gap:22px;position:relative;z-index:1}
+.ps-item{text-align:center}
+.ps-n{font-size:21px;font-weight:800;color:#fff;font-family:var(--mono)}
+.ps-l{font-size:10px;color:rgba(255,255,255,.6);margin-top:1px}
+.p-body{padding:0 16px;margin-top:-14px}
+.pts-card{background:var(--bg-card);border-radius:var(--r-xl);padding:16px;text-align:center;box-shadow:var(--shadow-lg);margin-bottom:12px;border:1px solid var(--border)}
+.pts-n{font-size:42px;font-weight:800;color:var(--warn);font-family:var(--mono)}
+.pts-l{font-size:12px;color:var(--tx-2);margin-top:3px}
+.lvl-bar{height:8px;background:var(--bg-card2);border-radius:4px;overflow:hidden;margin:10px 0 4px}
+.lvl-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--brand),var(--accent));transition:width 1.4s ease}
+.lvl-info{display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx-3)}
+.badge-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:10px 0 2px}
+.badge{background:var(--bg-card2);border-radius:var(--r-md);padding:11px 5px;text-align:center;cursor:pointer;transition:all .2s;border:1px solid transparent}
+.badge.earned{background:var(--bg-card);border-color:rgba(41,121,255,.22);box-shadow:0 2px 10px rgba(41,121,255,.12)}
+.badge:active{transform:scale(.95)}
+.badge-ic{font-size:24px;margin-bottom:4px}
+.badge-nm{font-size:9.5px;font-weight:700;color:var(--tx-3)}
+.badge.earned .badge-nm{color:var(--brand)}
+.badge.locked{opacity:.35}
+.lb-item{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border)}
+.lb-item:last-child{border:none}
+.lb-item.me{background:rgba(41,121,255,.05);border-radius:var(--r-md);padding:10px 10px;margin:0 -10px}
+.lb-rank{font-family:var(--mono);font-size:17px;font-weight:800;width:26px;text-align:center;color:var(--tx-3)}
+.lb-rank.gold{color:#FFD700}.lb-rank.silver{color:#C0C0C0}.lb-rank.bronze{color:#CD7F32}
+.lb-name{flex:1;font-size:13.5px;font-weight:700}
+.lb-pts{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--warn)}
+
+/* ════════════════════════════════════════════
+   PAGE 5 — ADMIN
+   ════════════════════════════════════════════ */
+#pg-admin{background:var(--bg);padding-bottom:24px}
+.admin-hdr{background:linear-gradient(135deg,#08101E,#122040);padding:18px 16px;border-bottom:1px solid rgba(41,121,255,.18)}
+.admin-top{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.admin-shield{width:46px;height:46px;background:rgba(41,121,255,.18);border:1px solid rgba(41,121,255,.35);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.admin-ttl{font-size:17px;font-weight:800;color:#fff}
+.admin-sub{font-size:11.5px;color:rgba(255,255,255,.45);margin-top:1px}
+.admin-meta{display:flex;gap:8px;flex-wrap:wrap}
+.del-timer{display:flex;align-items:center;gap:7px;background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.22);border-radius:var(--r-sm);padding:7px 11px;flex:1}
+.dt-lbl{font-size:10px;font-weight:700;color:var(--warn);letter-spacing:.4px}
+.dt-cd{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--warn)}
+.admin-user{display:flex;align-items:center;gap:7px;background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.18);border-radius:var(--r-sm);padding:7px 11px}
+.au-txt{font-size:11px;font-weight:700;color:var(--accent)}
+.admin-sg{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px}
+.as{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:15px}
+.as-ic{font-size:19px;margin-bottom:7px}
+.as-n{font-size:30px;font-weight:800;font-family:var(--mono);line-height:1;margin-bottom:2px}
+.as-l{font-size:10.5px;color:var(--tx-3);font-weight:600}
+.admin-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.admin-tbl{width:100%;border-collapse:collapse;font-size:11.5px;min-width:520px}
+.admin-tbl th{padding:8px 11px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--tx-3);background:var(--bg-card2);border-bottom:1px solid var(--border)}
+.admin-tbl td{padding:9px 11px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+[data-theme="day"] .admin-tbl td{border-bottom-color:rgba(0,0,0,.04)}
+.admin-tbl tr:last-child td{border:none}
+.admin-tbl tr:hover td{background:rgba(41,121,255,.03)}
+.pri{display:inline-block;padding:2px 9px;border-radius:var(--r-pill);font-size:10px;font-weight:800;letter-spacing:.4px}
+.pri-urgent{background:rgba(255,23,68,.16);color:var(--danger)}
+.pri-high{background:rgba(255,111,0,.15);color:#FF6F00}
+.pri-medium{background:rgba(255,179,0,.14);color:var(--warn)}
+.pri-low{background:rgba(0,200,83,.11);color:var(--safe)}
+.admin-acts{display:flex;gap:8px;padding:0 16px 8px;flex-wrap:wrap}
+.acc-row{display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.acc-row:last-child{border:none}
+.acc-time{font-family:var(--mono);font-size:11px;color:var(--tx-3);min-width:60px}
+.acc-road{font-size:13px;font-weight:700;flex:1}
+.acc-sev{font-size:11px;font-weight:700}
+
+/* ════════════════════════════════════════════
+   MODALS
+   ════════════════════════════════════════════ */
+.modal-bg{position:fixed;inset:0;z-index:6000;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);display:none;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex;animation:fadeIn .22s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-sheet{background:var(--bg-card);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:18px 20px 36px;width:100%;max-width:560px;animation:shUp .3s cubic-bezier(.34,1.1,.64,1);max-height:90dvh;overflow-y:auto}
+@keyframes shUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sh-handle{width:38px;height:4px;background:var(--border-hi);border-radius:2px;margin:0 auto 16px}
+.sh-title{font-size:19px;font-weight:800;margin-bottom:3px}
+.sh-sub{font-size:12.5px;color:var(--tx-2);margin-bottom:18px}
+.fl{font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--tx-2);margin-bottom:6px;display:block}
+.fi{width:100%;padding:12px 13px;background:var(--bg-card2);border:1.5px solid var(--border-hi);border-radius:var(--r-md);color:var(--tx);font-size:13.5px;font-family:var(--font);transition:border .2s,background .2s}
+.fi:focus{border-color:var(--brand);background:rgba(41,121,255,.05)}
+.fi::placeholder{color:var(--tx-3)}
+.fg{margin-bottom:14px}
+.sev-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.sev-opt{padding:11px 7px;background:var(--bg-card2);border:1.5px solid var(--border-hi);border-radius:var(--r-md);text-align:center;cursor:pointer;transition:all .18s;font-size:12.5px;font-weight:700;color:var(--tx-2)}
+.sev-opt .se{display:block;font-size:21px;margin-bottom:4px}
+.sev-opt.sel-danger{background:rgba(255,23,68,.1);border-color:var(--danger);color:var(--danger)}
+.sev-opt.sel-warn{background:rgba(255,111,0,.1);border-color:#FF6F00;color:#FF6F00}
+.sev-opt.sel-low{background:rgba(255,179,0,.08);border-color:var(--warn);color:var(--warn)}
+.gps-display{background:var(--bg-card2);border:1.5px solid var(--border-hi);border-radius:var(--r-md);padding:9px 13px;font-family:var(--mono);font-size:11.5px;color:var(--tx-2);display:flex;align-items:center;gap:8px}
+.sync-badge{display:flex;align-items:center;gap:6px;background:rgba(0,200,83,.08);border:1px solid rgba(0,200,83,.2);border-radius:var(--r-sm);padding:7px 11px;font-size:11px;font-weight:700;color:var(--safe);margin-bottom:14px}
+
+/* Emergency modal */
+.em-overlay{position:fixed;inset:0;z-index:9500;background:rgba(120,0,0,.65);backdrop-filter:blur(14px);display:none;align-items:center;justify-content:center;padding:20px}
+.em-overlay.show{display:flex;animation:fadeIn .2s}
+.em-card{background:#1A0A0A;border:2px solid rgba(255,23,68,.5);border-radius:var(--r-xl);padding:28px 24px;width:100%;max-width:360px;text-align:center;box-shadow:0 0 60px rgba(255,23,68,.25)}
+.em-icon{font-size:60px;animation:emPulse 1s infinite}
+@keyframes emPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.em-title{font-size:22px;font-weight:800;color:var(--danger);margin:12px 0 6px;letter-spacing:-.3px}
+.em-sub{font-size:13px;color:var(--tx-2);margin-bottom:20px;line-height:1.5}
+.em-count{font-size:72px;font-weight:800;font-family:var(--mono);color:var(--danger);line-height:1;margin-bottom:16px;text-shadow:0 0 30px rgba(255,23,68,.5)}
+.em-btns{display:flex;gap:10px}
+
+/* Auth screen */
+#auth-screen{position:fixed;inset:0;z-index:9000;background:linear-gradient(155deg,#070910 0%,#101828 50%,#080F15 100%);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#auth-screen.show{display:flex;animation:pgIn .35s ease}
+.auth-logo{width:68px;height:68px;background:linear-gradient(135deg,var(--brand),#00BFFF);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 0 36px var(--brand-glow);margin-bottom:18px}
+.auth-title{font-size:24px;font-weight:800;color:#fff;text-align:center;margin-bottom:5px;letter-spacing:-.4px}
+.auth-sub{font-size:13px;color:rgba(255,255,255,.4);text-align:center;margin-bottom:28px}
+.auth-card{width:100%;max-width:380px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--r-xl);padding:26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.5);backdrop-filter:blur(16px)}
+.auth-badge{display:flex;align-items:center;gap:7px;background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.22);border-radius:var(--r-sm);padding:7px 11px;margin-bottom:18px;font-size:11.5px;color:var(--accent);font-weight:600}
+.auth-lbl{font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:7px}
+.auth-roles{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:15px}
+.auth-role{padding:9px 7px;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.09);border-radius:var(--r-md);color:rgba(255,255,255,.4);font-size:11.5px;font-weight:700;text-align:center;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.auth-role.active{background:rgba(41,121,255,.18);border-color:var(--brand);color:#fff}
+.auth-fi{width:100%;padding:13px 15px;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.09);border-radius:var(--r-md);color:#fff;font-size:14px;font-family:var(--font);margin-bottom:14px;transition:border .2s}
+.auth-fi:focus{border-color:var(--brand);background:rgba(41,121,255,.08)}
+.auth-fi::placeholder{color:rgba(255,255,255,.22)}
+.auth-err{background:rgba(255,23,68,.12);border:1px solid rgba(255,23,68,.28);border-radius:var(--r-sm);padding:9px 13px;color:#FF8A9A;font-size:12.5px;margin-bottom:12px;display:none}
+.auth-err.show{display:block}
+.auth-note{text-align:center;font-size:11.5px;color:rgba(255,255,255,.28);margin-top:14px;line-height:1.5}
+.auth-note strong{color:rgba(255,255,255,.55)}
+
+/* Voice popup */
+#voice-popup{position:fixed;top:40px;left:12px;right:12px;z-index:8000;background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:14px 16px;display:none;align-items:center;gap:12px;box-shadow:var(--shadow-lg)}
+#voice-popup.show{display:flex;animation:slideUp .3s ease}
+.vp-ring{width:42px;height:42px;border-radius:50%;background:rgba(41,121,255,.15);border:2px solid var(--brand);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;animation:voicePulse 1s infinite}
+.vp-body{flex:1}
+.vp-msg{font-size:13px;font-weight:700;margin-bottom:2px}
+.vp-sub{font-size:11px;color:var(--tx-2)}
+
+/* Toast */
+#toast-wrap{position:fixed;bottom:76px;left:12px;right:12px;z-index:7000;pointer-events:none;display:flex;flex-direction:column;gap:6px;align-items:center}
+.toast{padding:10px 14px;border-radius:var(--r-lg);background:var(--glass);backdrop-filter:blur(16px);border:1px solid;display:flex;align-items:center;gap:8px;max-width:360px;box-shadow:var(--shadow);animation:pgIn .2s ease;pointer-events:all;font-size:12.5px;font-weight:600;color:var(--tx)}
+.toast-fade{animation:toastOut .28s ease forwards}
+@keyframes toastOut{to{opacity:0;transform:translateY(-8px)}}
+
+/* GPS permission prompt */
+#gps-prompt{position:fixed;inset:0;z-index:8500;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:24px}
+#gps-prompt.show{display:flex;animation:fadeIn .3s ease}
+.gps-card{background:var(--bg-card);border-radius:var(--r-xl);padding:28px 24px;max-width:340px;text-align:center;box-shadow:var(--shadow-lg)}
+.gps-icon{font-size:56px;margin-bottom:14px}
+.gps-title{font-size:20px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
+.gps-body{font-size:13px;color:var(--tx-2);line-height:1.6;margin-bottom:20px}
+.gps-note{font-size:11px;color:var(--tx-3);margin-top:12px;line-height:1.5}
+
+/* PWA offline indicator */
+#offline-banner{position:fixed;top:26px;left:0;right:0;z-index:4600;background:#FF6F00;padding:7px 14px;text-align:center;font-size:12px;font-weight:700;color:#fff;display:none}
+#offline-banner.show{display:block}
+
+/* Responsive desktop framing */
+@media(min-width:900px){
+  #shell{max-width:430px;margin:0 auto;box-shadow:var(--shadow-lg)}
+  body{background:#000}
+  .map-wrap{height:calc(100dvh - 88px)}
+}
+</style>
+</head>
+<body>
+
+<!-- ════ SPLASH ════ -->
+<div id="splash">
+  <div class="splash-logo">🛡️</div>
+  <div class="splash-name">SaveLYF</div>
+  <div class="splash-tag">Smart Road Safety · Gaborone, BW</div>
+  <div class="splash-bar"><div class="splash-fill"></div></div>
+</div>
+
+<!-- ════ OFFLINE BANNER ════ -->
+<div id="offline-banner">📡 Offline Mode — Using Cached Data</div>
+
+<!-- ════ INSTALL BANNER ════ -->
+<div id="install-bar">
+  <span class="ib-text">📲 Install SaveLYF as an App — works offline!</span>
+  <button class="ib-btn" id="install-btn">Install Free</button>
+  <button class="ib-close" onclick="document.getElementById('install-bar').classList.remove('show')">✕</button>
+</div>
+
+<!-- Firebase Demo Banner removed — production mode only -->
+
+<!-- ════ THEME BUTTON ════ -->
+<button id="theme-btn" onclick="toggleTheme()" title="Toggle Day/Night">🌙</button>
+
+<!-- ════ VOICE POPUP ════ -->
+<div id="voice-popup">
+  <div class="vp-ring">🔊</div>
+  <div class="vp-body">
+    <div class="vp-msg" id="vp-msg">Warning! Dangerous pothole ahead.</div>
+    <div class="vp-sub" id="vp-sub">Speed: 0 km/h · Risk: HIGH</div>
+  </div>
+</div>
+
+<!-- ════ TOAST CONTAINER ════ -->
+<div id="toast-wrap"></div>
+
+<!-- ════ GPS PERMISSION PROMPT ════ -->
+<div id="gps-prompt">
+  <div class="gps-card">
+    <div class="gps-icon">📍</div>
+    <div class="gps-title">Enable GPS Location</div>
+    <div class="gps-body">SaveLYF uses your real GPS position to show nearby hazards and track speed — keeping you safe on Botswana roads.</div>
+    <button class="btn btn-brand btn-lg btn-full" onclick="requestGPS()">Enable GPS →</button>
+    <div class="gps-note">🔒 Location data stays on your device. We never share it without permission.</div>
+  </div>
+</div>
+
+<!-- ════ ADMIN AUTH SCREEN ════ -->
+<div id="auth-screen">
+  <div class="auth-logo">🛡️</div>
+  <div class="auth-title">SaveLYF Admin Portal</div>
+  <div class="auth-sub">Authorized Personnel Only · Government Access</div>
+  <div class="auth-card">
+    <div class="auth-badge"><span>🔒</span><span>Secured · Accessible from any platform</span></div>
+    <div class="auth-lbl">Access Role</div>
+    <div class="auth-roles">
+      <button class="auth-role active" onclick="selectRole(this,'official')">🏛️ Gov Official</button>
+      <button class="auth-role" onclick="selectRole(this,'engineer')">🔧 Road Engineer</button>
+      <button class="auth-role" onclick="selectRole(this,'analyst')">📊 Data Analyst</button>
+      <button class="auth-role" onclick="selectRole(this,'super')">⚡ Super Admin</button>
+    </div>
+    <div class="auth-lbl">Username / Email</div>
+    <input class="auth-fi" id="auth-user" type="text" placeholder="admin@gov.bw" autocomplete="off">
+    <div class="auth-lbl">Password</div>
+    <input class="auth-fi" id="auth-pass" type="password" placeholder="Enter password">
+    <div class="auth-err" id="auth-err">❌ Invalid credentials. Please try again.</div>
+    <button class="btn btn-brand btn-lg btn-full" onclick="doLogin()">Sign In Securely →</button>
+    <div class="auth-note">🔐 Authorised personnel only · Credentials issued by SaveLYF Admin</div>
+  </div>
+</div>
+
+<!-- ════ PROFILE CREATE/SIGNIN MODAL ════ -->
+<div class="modal-bg" id="profile-modal">
+  <div class="modal-sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title" id="pm-title">Create Profile</div>
+    <div class="sh-sub" id="pm-sub">Join the SaveLYF community · Free forever</div>
+    <div id="pm-signup-fields">
+      <div class="fg">
+        <label class="fl">Display Name</label>
+        <input class="fi" id="pm-name" type="text" placeholder="e.g. SafeDriver_TM" maxlength="30">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Email Address</label>
+      <input class="fi" id="pm-email" type="email" placeholder="you@example.com">
+    </div>
+    <div class="fg">
+      <label class="fl">Password</label>
+      <input class="fi" id="pm-pass" type="password" placeholder="Min 6 characters">
+    </div>
+    <div class="auth-err" id="pm-err" style="display:none;margin-bottom:12px;padding:9px 13px;border-radius:var(--r-sm);background:rgba(255,23,68,.12);border:1px solid rgba(255,23,68,.28);color:#FF8A9A;font-size:12.5px"></div>
+    <button class="btn btn-brand btn-lg btn-full" id="pm-submit" onclick="submitProfileModal()">Create Profile →</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost btn-full" onclick="closeModal('profile-modal')">Cancel</button>
+    <div style="text-align:center;margin-top:12px;font-size:11.5px;color:var(--tx-3)" id="pm-toggle">
+      Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Sign In instead</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ EMERGENCY MODAL ════ -->
+<div class="em-overlay" id="em-overlay">
+  <div class="em-card">
+    <div class="em-icon">🆘</div>
+    <div class="em-title">EMERGENCY SOS</div>
+    <div class="em-sub">Emergency alert will be sent in <br>Your GPS location will be shared</div>
+    <div class="em-count" id="em-count">10</div>
+    <div class="em-btns">
+      <button class="btn btn-safe btn-lg btn-pill" style="flex:1" onclick="cancelEM()">✅ I'm Safe</button>
+      <button class="btn btn-danger btn-lg btn-pill" style="flex:1" onclick="sendSOS()">🆘 Send SOS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ MARK POTHOLE MODAL ════ -->
+<div class="modal-bg" id="report-modal">
+  <div class="modal-sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title">⚠ Report Road Hazard</div>
+    <div class="sh-sub">Help other drivers in Botswana stay safe</div>
+    <div id="sync-status" class="sync-badge"><span>🔄</span><span id="sync-text">Saved locally · Syncing to community…</span></div>
+    <div class="fg">
+      <label class="fl">Road Name</label>
+      <input class="fi" id="f-road" type="text" placeholder="e.g. Main Mall Road, Gaborone">
+    </div>
+    <div class="fg">
+      <label class="fl">Severity</label>
+      <div class="sev-grid">
+        <div class="sev-opt sel-danger" id="sev-dangerous" onclick="setSev('dangerous')"><span class="se">🚨</span>Dangerous</div>
+        <div class="sev-opt" id="sev-moderate" onclick="setSev('moderate')"><span class="se">⚠️</span>Moderate</div>
+        <div class="sev-opt" id="sev-low" onclick="setSev('low')"><span class="se">🟡</span>Low Risk</div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Your GPS Location</label>
+      <div class="gps-display">📍 <span id="f-gps">Acquiring position…</span></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Additional Notes (optional)</label>
+      <input class="fi" id="f-notes" type="text" placeholder="e.g. Near the traffic lights, large crater">
+    </div>
+    <button class="btn btn-danger btn-lg btn-full" onclick="submitReport()">Submit Report →</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-ghost btn-full" onclick="closeModal('report-modal')">Cancel</button>
+  </div>
+</div>
+
+<!-- ════ APP SHELL ════ -->
+<div id="shell">
+
+  <!-- Android Status Bar -->
+  <div id="status">
+    <span class="st-time" id="sb-time">09:41</span>
+    <div class="st-right">
+      <span class="st-gps" id="st-gps-txt">GPS OFF</span>
+      <span>📶</span>
+      <span id="st-batt">100%</span>
+    </div>
+  </div>
+
+  <!-- Pages -->
+  <div id="pages">
+
+    <!-- ═══ DASHBOARD MAP ═══ -->
+    <div class="page active" id="pg-dashboard">
+      <div class="map-wrap">
+
+        <!-- Leaflet Map -->
+        <div id="leafmap"></div>
+
+        <!-- Map Top Bar -->
+        <div class="map-topbar">
+          <div class="road-pill">
+            <span class="rp-icon">🛣️</span>
+            <div>
+              <div class="rp-name" id="rp-road">Gaborone · SaveLYF Active</div>
+              <div class="rp-dist" id="rp-dist">Monitoring road conditions…</div>
+            </div>
+          </div>
+          <button class="map-ctrl" onclick="toggleHeat()" id="heat-btn" title="Heatmap">🌡️</button>
+          <button class="map-ctrl" onclick="toggleLegend()" title="Legend">🗺️</button>
+        </div>
+
+        <!-- GPS Status Pill -->
+        <div class="gps-pill">
+          <div class="gps-dot searching" id="gps-dot"></div>
+          <span id="gps-acc-txt">Acquiring GPS…</span>
+        </div>
+
+        <!-- Right Controls -->
+        <div class="map-rightbar">
+          <button class="map-ctrl" onclick="App.map&&App.map.zoomIn()">+</button>
+          <button class="map-ctrl" onclick="App.map&&App.map.zoomOut()">−</button>
+          <button class="map-ctrl" onclick="recenterMap()">◎</button>
+        </div>
+
+        <!-- Legend -->
+        <div class="map-legend" id="map-legend">
+          <div class="leg-row"><div class="leg-dot" style="background:#FF1744"></div>Dangerous</div>
+          <div class="leg-row"><div class="leg-dot" style="background:#FFB300"></div>Moderate</div>
+          <div class="leg-row"><div class="leg-dot" style="background:#FF6F00"></div>Low Risk</div>
+          <div class="leg-row"><div class="leg-dot" style="background:#2962FF"></div>Fixed ✓</div>
+          <div class="leg-row"><div class="leg-dot" style="background:#AA00FF"></div>Accident</div>
+          <div class="leg-row"><div class="leg-dot" style="background:#2979FF"></div>You</div>
+        </div>
+
+        <!-- Alert Slide -->
+        <div class="alert-slide alert-danger-bg" id="alert-slide">
+          <button class="alert-close" onclick="closeAlert()">✕</button>
+          <div class="alert-icon">⚠️</div>
+          <div class="alert-body">
+            <div class="alert-title" id="al-title">DANGEROUS POTHOLE</div>
+            <div class="alert-sub" id="al-sub">340m ahead · Main Mall Road</div>
+          </div>
+        </div>
+
+        <!-- Map Tooltip -->
+        <div class="mtt" id="mtt">
+          <div class="mtt-road" id="mtt-road">Main Mall Road</div>
+          <div class="mtt-det" id="mtt-det"></div>
+          <div class="mtt-btns">
+            <button class="mtt-btn" onclick="verifyHazard('exists')">✅ Still There</button>
+            <button class="mtt-btn" onclick="verifyHazard('fixed')">🔧 Fixed Now</button>
+          </div>
+        </div>
+
+        <!-- Bottom Speed Panel -->
+        <div class="map-footer">
+          <div class="spd-card">
+            <div class="spd-block">
+              <div class="spd-num spd-safe" id="spd-num">0</div>
+              <div class="spd-unit">KM/H</div>
+            </div>
+            <div class="spd-div"></div>
+            <div class="spd-info">
+              <div class="spd-road" id="spd-road">Gaborone CBD</div>
+              <div class="spd-hazard" id="spd-hazard">⚡ GPS monitoring active</div>
+              <div class="spd-tag"><span class="tag tag-safe" id="spd-status-tag">SAFE</span></div>
+            </div>
+            <button class="voice-btn" id="voice-btn" onclick="toggleVoice()" title="Voice Alerts">🔊</button>
+          </div>
+        </div>
+
+        <!-- FAB Report -->
+        <button class="fab" onclick="openReportModal()" title="Report Hazard">⚠</button>
+
+      </div><!-- end map-wrap -->
+    </div><!-- end dashboard -->
+
+    <!-- ═══ LIVE DRIVE ═══ -->
+    <div class="page" id="pg-drive">
+      <div class="drive-hero">
+        <div class="drive-hdr">
+          <div class="drive-title">Live Drive</div>
+          <div class="drive-status"><div class="drive-status-dot"></div>GPS ACTIVE</div>
+        </div>
+
+        <!-- SVG Speedometer -->
+        <div class="speedo-wrap">
+          <svg viewBox="0 0 280 280" fill="none">
+            <circle cx="140" cy="140" r="125" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <path d="M25 178 A118 118 0 1 1 255 178" stroke="rgba(255,255,255,0.08)" stroke-width="22" stroke-linecap="round" fill="none"/>
+            <path id="spd-arc" d="M25 178 A118 118 0 1 1 255 178" stroke="url(#spdGrad)" stroke-width="22" stroke-linecap="round" fill="none" stroke-dasharray="0 740" style="transition:stroke-dasharray .5s ease"/>
+            <defs>
+              <linearGradient id="spdGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00C853"/>
+                <stop offset="45%" stop-color="#2979FF"/>
+                <stop offset="78%" stop-color="#FFB300"/>
+                <stop offset="100%" stop-color="#FF1744"/>
+              </linearGradient>
+            </defs>
+            <!-- Tick marks -->
+            <g stroke="rgba(255,255,255,0.15)" stroke-width="1.5">
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(-126,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(-84,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(-42,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(0,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(42,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(84,140,140)"/>
+              <line x1="140" y1="22" x2="140" y2="36" transform="rotate(126,140,140)"/>
+            </g>
+          </svg>
+          <div class="speedo-center">
+            <div class="speedo-num spd-safe" id="drive-spd">0</div>
+            <div class="speedo-kmh">KM/H</div>
+            <div class="speedo-status spd-safe" id="drive-status">● All Clear</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="drive-grid">
+        <div class="dc"><div class="dc-icon">📍</div><div class="dc-val" id="dc-lat">–</div><div class="dc-lbl">LATITUDE</div></div>
+        <div class="dc"><div class="dc-icon">📍</div><div class="dc-val" id="dc-lng">–</div><div class="dc-lbl">LONGITUDE</div></div>
+        <div class="dc"><div class="dc-icon">🎯</div><div class="dc-val" id="dc-acc">–</div><div class="dc-lbl">ACCURACY (m)</div></div>
+        <div class="dc"><div class="dc-icon">🧭</div><div class="dc-val" id="dc-hdg">–</div><div class="dc-lbl">HEADING</div></div>
+      </div>
+
+      <div class="danger-meter-card">
+        <div class="dm-label">Speed Risk Meter</div>
+        <div class="dm-track"><div class="dm-needle" id="dm-needle" style="left:5%"></div></div>
+        <div class="dm-zones"><span class="dm-zone" style="color:var(--safe)">SAFE</span><span class="dm-zone" style="color:var(--warn)">CAUTION</span><span class="dm-zone" style="color:var(--danger)">DANGER</span></div>
+      </div>
+
+      <div class="drive-btns">
+        <button class="btn btn-brand" style="flex:1" onclick="toggleVoice()">🔊 Voice <span id="voice-label">ON</span></button>
+        <button class="btn btn-danger" style="flex:1" onclick="triggerEmergency()">🆘 Emergency</button>
+      </div>
+
+      <div style="padding:0 16px 8px"><div class="ct" style="margin-bottom:8px;font-size:10px;letter-spacing:1.3px">UPCOMING HAZARDS NEARBY</div></div>
+      <div class="hazard-list" id="hazard-list">
+        <!-- populated by JS -->
+      </div>
+    </div><!-- end drive -->
+
+    <!-- ═══ INSIGHTS ═══ -->
+    <div class="page" id="pg-insights">
+      <div class="ph"><div><div class="pt">Road Insights</div><div class="ps">Gaborone · Live Data</div></div></div>
+      <div class="metric-grid">
+        <div class="mc"><div class="mc-em">🚨</div><div class="mc-n" id="ins-danger" style="color:var(--danger)">0</div><div class="mc-l">DANGEROUS</div></div>
+        <div class="mc"><div class="mc-em">⚠️</div><div class="mc-n" id="ins-moderate" style="color:var(--warn)">0</div><div class="mc-l">MODERATE</div></div>
+        <div class="mc"><div class="mc-em">✅</div><div class="mc-n" id="ins-fixed" style="color:var(--safe)">0</div><div class="mc-l">FIXED</div></div>
+        <div class="mc"><div class="mc-em">📊</div><div class="mc-n" id="ins-total" style="color:var(--brand)">0</div><div class="mc-l">TOTAL REPORTS</div></div>
+      </div>
+
+      <div class="card mb12 mx16" style="margin:0 16px 12px">
+        <div class="ch"><span class="ct">Risk Ranking by Road</span></div>
+        <div id="risk-bars" style="padding:8px 0 10px"><!-- populated --></div>
+      </div>
+
+      <div class="card mb12 mx16" style="margin:0 16px 12px">
+        <div class="ch"><span class="ct">Weekly Alert Activity</span></div>
+        <div class="act-wrap" id="act-bars"></div>
+        <div class="act-labels" id="act-lbls"></div>
+      </div>
+
+      <div class="card mb12 mx16" style="margin:0 16px 12px">
+        <div class="ch"><span class="ct">Full Road Risk Table</span></div>
+        <div class="risk-scroll">
+          <table class="risk-table">
+            <thead><tr><th>Road</th><th>Severity</th><th>Reports</th><th>Risk</th><th>Dist.</th></tr></thead>
+            <tbody id="risk-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- end insights -->
+
+    <!-- ═══ PROFILE ═══ -->
+    <div class="page" id="pg-profile">
+      <div class="p-hero">
+        <div class="p-av" id="p-av">👤</div>
+        <div class="p-name" id="p-name">Anonymous Driver</div>
+        <div class="p-mode" id="p-mode">Community Reporter · Gaborone</div>
+        <div class="p-stats">
+          <div class="ps-item"><div class="ps-n" id="p-reports">0</div><div class="ps-l">Reports</div></div>
+          <div class="ps-item"><div class="ps-n" id="p-verif">0</div><div class="ps-l">Verified</div></div>
+          <div class="ps-item"><div class="ps-n" id="p-saves">0</div><div class="ps-l">Lives Aided</div></div>
+        </div>
+      </div>
+
+      <div class="p-body">
+        <!-- Anonymous prompt / Profile info card -->
+        <div id="anon-prompt" class="card" style="margin:-14px 0 12px;border-radius:var(--r-xl);padding:16px;text-align:center;box-shadow:var(--shadow-lg)">
+          <div style="font-size:32px;margin-bottom:8px">👤</div>
+          <div style="font-size:15px;font-weight:800;margin-bottom:4px">You are Anonymous</div>
+          <div style="font-size:12px;color:var(--tx-2);margin-bottom:14px;line-height:1.5">Create a free profile to track your reports,<br>earn badges, and appear on the leaderboard.</div>
+          <button class="btn btn-brand btn-full" onclick="openProfileModal()">Create Profile →</button>
+          <div style="margin-top:8px;font-size:11px;color:var(--tx-3)">Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="openProfileModal('signin')">Sign In</span></div>
+        </div>
+
+        <div id="pts-section" style="display:none">
+          <div class="pts-card mt" style="margin-top:-14px">
+            <div class="pts-n" id="p-pts">0</div>
+            <div class="pts-l">SafePoints earned</div>
+            <div class="lvl-bar"><div class="lvl-fill" id="lvl-fill" style="width:0%"></div></div>
+            <div class="lvl-info" id="lvl-info"><span>Level 1 · New Driver</span><span>0 / 100 to Level 2</span></div>
+          </div>
+        </div>
+
+        <div class="card mb12" style="margin-bottom:12px">
+          <div class="ch"><span class="ct">Achievement Badges</span></div>
+          <div class="badge-grid" id="badge-grid" style="padding:12px">
+            <!-- populated dynamically -->
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <div class="ch"><span class="ct">Community Leaderboard</span><span id="lb-loading" style="font-size:10px;color:var(--tx-3)">Loading…</span></div>
+          <div style="padding:4px 14px 10px" id="lb-list"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <button class="btn btn-ghost" id="share-btn" style="flex:1" onclick="shareProfile()">📤 Share Profile</button>
+          <button class="btn btn-danger btn-pill" style="flex:1" onclick="triggerEmergency()">🆘 SOS</button>
+        </div>
+        <div id="signout-wrap" style="display:none;margin-bottom:12px">
+          <button class="btn btn-ghost btn-full" onclick="signOutProfile()">🔒 Sign Out of Profile</button>
+        </div>
+      </div>
+    </div><!-- end profile -->
+
+    <!-- ═══ ADMIN ═══ -->
+    <div class="page" id="pg-admin">
+      <div class="admin-hdr">
+        <div class="admin-top">
+          <div class="admin-shield">🛡️</div>
+          <div>
+            <div class="admin-ttl">Government Admin Portal</div>
+            <div class="admin-sub">Road Maintenance Priority Queue · Botswana</div>
+          </div>
+        </div>
+        <div class="admin-meta">
+          <div class="del-timer"><span>🗑️</span><div><div class="dt-lbl">DATA AUTO-DELETE</div><div class="dt-cd" id="admin-cd">– – – –</div></div></div>
+          <div class="admin-user"><span>🔐</span><span class="au-txt" id="admin-role-display">Gov Official</span></div>
+        </div>
+      </div>
+
+      <div class="admin-sg">
+        <div class="as"><div class="as-ic">🚨</div><div class="as-n" style="color:var(--danger)" id="as-urgent">2</div><div class="as-l">URGENT ROADS</div></div>
+        <div class="as"><div class="as-ic">📊</div><div class="as-n" style="color:var(--brand)" id="as-total">0</div><div class="as-l">TOTAL REPORTS</div></div>
+        <div class="as"><div class="as-ic">✅</div><div class="as-n" style="color:var(--safe)" id="as-fixed">1</div><div class="as-l">FIXED TODAY</div></div>
+        <div class="as"><div class="as-ic">⚡</div><div class="as-n" style="color:var(--warn)" id="as-accidents">3</div><div class="as-l">ACCIDENTS 24H</div></div>
+      </div>
+
+      <div class="card mb12 mx16" style="margin:0 16px 12px">
+        <div class="ch"><span class="ct">🚨 Priority Repair Queue</span><button class="btn btn-safe btn-sm" onclick="exportCSV()">⬇ CSV</button></div>
+        <div class="admin-tbl-wrap">
+          <table class="admin-tbl">
+            <thead><tr><th>#</th><th>Road</th><th>Area</th><th>Reports</th><th>Priority</th><th>Risk</th><th>Action</th></tr></thead>
+            <tbody id="admin-tbody"><!-- populated --></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mb12 mx16" style="margin:0 16px 12px">
+        <div class="ch"><span class="ct">🚗 Recent Accident Reports</span></div>
+        <div id="acc-list"><!-- populated --></div>
+      </div>
+
+      <div class="card mb12 mx16" id="pending-removal-card" style="margin:0 16px 12px;display:none">
+        <div class="ch" style="background:rgba(0,200,83,.06)"><span class="ct" style="color:var(--safe)">✅ Awaiting Removal Confirmation</span></div>
+        <div class="admin-tbl-wrap">
+          <table class="admin-tbl">
+            <thead><tr><th>Road</th><th>Reported Fixed</th><th>Fix Votes</th><th>Confirmed By</th><th>Action</th></tr></thead>
+            <tbody id="pending-removal-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-acts">
+        <button class="btn btn-warn" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-ghost" onclick="adminEmailReport()">📧 Email Report</button>
+        <button class="btn btn-danger btn-sm" onclick="doLogout()">🔒 Logout</button>
+      </div>
+    </div><!-- end admin -->
+
+  </div><!-- end pages -->
+
+  <!-- Bottom Nav -->
+  <nav id="nav">
+    <div class="ni active" id="nav-map" onclick="goPage('dashboard','nav-map')">
+      <div class="ic">🗺️</div><div class="lb">Map</div>
+    </div>
+    <div class="ni" id="nav-drive" onclick="goPage('drive','nav-drive')">
+      <div class="ic">🚗</div><div class="lb">Drive</div>
+      <div class="ni-badge"></div>
+    </div>
+    <div class="ni" id="nav-ins" onclick="goPage('insights','nav-ins')">
+      <div class="ic">📊</div><div class="lb">Insights</div>
+    </div>
+    <div class="ni" id="nav-prof" onclick="goPage('profile','nav-prof')">
+      <div class="ic">👤</div><div class="lb">Profile</div>
+    </div>
+    <div class="ni" id="nav-admin" onclick="requestAdmin()">
+      <div class="ic">🛡️</div><div class="lb">Admin</div>
+    </div>
+  </nav>
+
+</div><!-- end shell -->
+
+<!-- ════════════════════════════════════════════════════════
+     JAVASCRIPT — SaveLYF Production PWA
+     Free Stack: Leaflet + Firebase Spark + Browser APIs
+     ════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════
+   FIREBASE CONFIGURATION
+   ─────────────────────────────────────────
+   HOW TO SET UP FREE (5 minutes):
+   1. Go to https://console.firebase.google.com
+   2. Click "Add project" → Name it "SaveLYF" → Create
+   3. Click "</>" (Web App) → Register app
+   4. Copy the firebaseConfig object here
+   5. In Firebase Console → Build → Firestore Database → Create
+   6. In Firebase Console → Build → Authentication → Enable Anonymous
+   7. Done! All FREE on Spark plan (50k reads/day)
+   ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   FIREBASE CONFIGURATION
+   ─────────────────────────────────────────
+   Config is loaded from config.js (kept outside version control).
+   Never hardcode credentials here. See config.js for setup instructions.
+   ══════════════════════════════════════════ */
+const FIREBASE_CONFIG = (typeof window.SAVELYF_CONFIG !== 'undefined')
+  ? window.SAVELYF_CONFIG
+  : null;
+
+// DEMO_MODE is true only when config.js is missing or unpopulated
+const DEMO_MODE = !FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey;
+
+/* ══════════════════════════════════════════
+   APP STATE
+   ══════════════════════════════════════════ */
+const App = {
+  // GPS
+  gps: { lat: -24.6530, lng: 25.9050, speed: 0, heading: null, accuracy: 9999, valid: false },
+  gpsWatchId: null, prevPos: null, prevTime: null,
+  calculatedHeading: null, // derived from position movement when GPS heading is null
+
+  // Map
+  map: null, tileDark: null, tileLight: null,
+  userMarker: null, potholeMarkers: [],
+  heatCircles: [], heatOn: false, legendOn: false,
+  theme: 'dark',
+
+  // Drive
+  voiceOn: true, alertCooldown: false,
+  lastAlertId: null, simRunning: false, simTimer: null,
+
+  // Firebase
+  db: null, auth: null, firebaseUser: null,
+
+  // Data
+  potholes: [],
+
+  // Admin
+  adminLoggedIn: false, adminRole: 'official',
+  emTimer: null, emCount: 10,
+
+  // PWA
+  deferredPrompt: null,
+
+  // Stats
+  userReports: 0, userVerifications: 0,
+  selectedSev: 'dangerous',
+
+  // Points & profile
+  sessionPoints: 0,
+  alertsGiven: 0,
+  userProfile: null,
+
+  // Offline / IndexedDB
+  idb: null,             // IndexedDB connection handle
+  syncedAt: 0,           // timestamp of last successful Firebase sync
+  pendingFlush: false,   // true while flushing the offline queue
+};
+
+/* ══════════════════════════════════════════
+   SEED DATA — Real Gaborone GPS Coordinates
+   ══════════════════════════════════════════ */
+const SEED_POTHOLES = [
+  { id:'s1', lat:-24.6545, lng:25.9065, road:'Main Mall Road',      severity:'Dangerous', reports:8,  risk:94, verified:5, fixed:false },
+  { id:'s2', lat:-24.6080, lng:25.9300, road:'Game City Road',      severity:'Dangerous', reports:12, risk:88, verified:7, fixed:false },
+  { id:'s3', lat:-24.6700, lng:25.8950, road:'Sesame Street',       severity:'Dangerous', reports:3,  risk:77, verified:2, fixed:false },
+  { id:'s4', lat:-24.6550, lng:25.8980, road:'Nelson Mandela Drive',severity:'Moderate',  reports:5,  risk:71, verified:3, fixed:false },
+  { id:'s5', lat:-24.6700, lng:25.8800, road:'Notwane Road',        severity:'Moderate',  reports:5,  risk:57, verified:2, fixed:false },
+  { id:'s6', lat:-24.6400, lng:25.9650, road:'BBS Mall Road',       severity:'Low Risk',  reports:2,  risk:28, verified:1, fixed:false },
+  { id:'s7', lat:-24.6900, lng:25.9200, road:'Airport Road (A1)',   severity:'Fixed',     reports:0,  risk:0,  verified:6, fixed:true  },
+  { id:'s8', lat:-24.6550, lng:25.9300, road:'Tlokweng Road',       severity:'Moderate',  reports:4,  risk:55, verified:2, fixed:false },
+  { id:'s9', lat:-24.6200, lng:25.9100, road:'Molapo Crossing Rd',  severity:'Low Risk',  reports:2,  risk:32, verified:1, fixed:false },
+  { id:'s10',lat:-24.6450, lng:25.8850, road:'Phatshiwe Road',      severity:'Dangerous', reports:6,  risk:82, verified:4, fixed:false },
+  { id:'s11',lat:-24.6600, lng:25.9500, road:'Orapa House Road',    severity:'Moderate',  reports:3,  risk:48, verified:1, fixed:false },
+  { id:'s12',lat:-24.6820, lng:25.8920, road:'Old Lobatse Road',    severity:'Low Risk',  reports:1,  risk:22, verified:0, fixed:false },
+];
+
+const ACCIDENT_DATA = [
+  { lat:-24.6540, lng:25.9070, road:'Main Mall Road',  time:'2:14 PM', sev:'Minor',   ttl:9960000 },
+  { lat:-24.6090, lng:25.9310, road:'Game City Road',  time:'11:32 AM',sev:'Serious', ttl:2700000 },
+  { lat:-24.6690, lng:25.8800, road:'Notwane Road',    time:'8:05 AM', sev:'Minor',   ttl:600000  },
+];
+
+/* ══════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════ */
+async function init() {
+  // Update clock
+  updateClock();
+  setInterval(updateClock, 15000);
+
+  // Check system theme
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    App.theme = 'day';
+    document.documentElement.setAttribute('data-theme','day');
+    document.getElementById('theme-btn').textContent = '☀️';
+    document.getElementById('theme-meta').content = '#F0EDE6';
+  }
+
+  // ── STEP 1: Open IndexedDB first — always, before anything else ──
+  try {
+    App.idb = await openIDB();
+    console.log('[SaveLYF] IndexedDB ready');
+  } catch(e) {
+    console.warn('[SaveLYF] IndexedDB unavailable:', e);
+  }
+
+  // ── STEP 2: Pre-load cached potholes from IDB so map is instant ──
+  const cached = await idbLoadPotholes().catch(() => []);
+  if (cached.length > 0) {
+    App.potholes = cached;
+    App.syncedAt = await idbGetSyncedAt();
+    console.log('[SaveLYF] Pre-loaded', cached.length, 'potholes from device cache');
+  }
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => {
+      console.log('[SaveLYF] Service Worker registered — offline mode enabled');
+    }).catch(e => console.log('[SaveLYF] SW registration failed:', e));
+  }
+
+  // PWA install prompt
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    App.deferredPrompt = e;
+    document.getElementById('install-bar').classList.add('show');
+  });
+  document.getElementById('install-btn').onclick = async () => {
+    if (App.deferredPrompt) {
+      App.deferredPrompt.prompt();
+      const result = await App.deferredPrompt.userChoice;
+      if (result.outcome === 'accepted') toast('✅ SaveLYF installed as App!','safe');
+      App.deferredPrompt = null;
+      document.getElementById('install-bar').classList.remove('show');
+    }
+  };
+
+  // Offline/online detection
+  window.addEventListener('offline', () => {
+    document.getElementById('offline-banner').classList.add('show');
+    updateSyncBadge();
+  });
+  window.addEventListener('online', async () => {
+    document.getElementById('offline-banner').classList.remove('show');
+    updateSyncBadge();
+    if (!DEMO_MODE) {
+      if (App.db) {
+        // Firebase already connected — just flush the queue
+        toast('📡 Back online — syncing offline reports…', 'safe');
+        await flushPendingQueue();
+      } else {
+        // Firebase never connected (was offline from start) — connect now
+        try {
+          await initFirebase();
+          await flushPendingQueue();
+          toast('📡 Connected to Firebase — data synced!', 'safe');
+        } catch(e) {
+          console.warn('[SaveLYF] Firebase reconnect failed:', e);
+        }
+      }
+    }
+  });
+
+  // ── STEP 3: Connect Firebase or run on device cache ──
+  if (!DEMO_MODE) {
+    try { await initFirebase(); }
+    catch(e) {
+      console.warn('[SaveLYF] Firebase unavailable — running on device cache:', e);
+      if (App.potholes.length === 0) await initDemoMode();
+      toast('📴 Offline — driving on cached road data', 'warn');
+    }
+  } else {
+    await initDemoMode();
+  }
+
+  // Init map — data already loaded from IDB so markers show immediately
+  initMap();
+
+  // Request GPS after short delay
+  setTimeout(() => {
+    if (!('geolocation' in navigator)) {
+      toast('⚠️ GPS not available on this device','warn');
+    } else {
+      document.getElementById('gps-prompt').classList.add('show');
+    }
+  }, 2000);
+
+  // Init UI
+  initInsights();
+  initProfile();
+  initAdmin();
+  initHazardList();
+
+  // Dismiss splash
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+    setTimeout(() => document.getElementById('splash').remove(), 600);
+    if (DEMO_MODE) toast('⚠️ config.js not found — running in local Demo Mode','warn');
+    toast('🛡️ SaveLYF active · Gaborone, Botswana','safe');
+    updateSyncBadge();
+  }, 2000);
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   INDEXEDDB — OFFLINE-FIRST LOCAL DATABASE
+   ─────────────────────────────────────────────────────────
+   3 object stores:
+   • potholes      — mirror of Firebase, keyed by id
+   • pending_queue — actions taken offline, flushed on reconnect
+   • meta          — sync timestamps and app metadata
+   ══════════════════════════════════════════════════════════ */
+const IDB_NAME    = 'savelyf_db';
+const IDB_VERSION = 1;
+
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('potholes')) {
+        const ps = db.createObjectStore('potholes', { keyPath: 'id' });
+        ps.createIndex('severity', 'severity', { unique: false });
+        ps.createIndex('fixed',    'fixed',    { unique: false });
+      }
+      if (!db.objectStoreNames.contains('pending_queue')) {
+        db.createObjectStore('pending_queue', { keyPath: 'qid', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Write all potholes to local IDB (called after every Firebase snapshot)
+async function idbSavePotholes(potholes) {
+  if (!App.idb) return;
+  const tx = App.idb.transaction(['potholes', 'meta'], 'readwrite');
+  const store = tx.objectStore('potholes');
+  store.clear();
+  potholes.forEach(p => store.put({ ...p }));
+  tx.objectStore('meta').put({ key: 'syncedAt', value: Date.now() });
+  return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+}
+
+// Load all potholes from IDB (used on startup before Firebase connects)
+async function idbLoadPotholes() {
+  if (!App.idb) return [];
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('potholes', 'readonly');
+    const req = tx.objectStore('potholes').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Load the last-sync timestamp from IDB
+async function idbGetSyncedAt() {
+  if (!App.idb) return 0;
+  return new Promise(resolve => {
+    const tx  = App.idb.transaction('meta', 'readonly');
+    const req = tx.objectStore('meta').get('syncedAt');
+    req.onsuccess = e => resolve(e.target.result?.value || 0);
+    req.onerror   = () => resolve(0);
+  });
+}
+
+// Queue an action taken while offline  (type: 'add_pothole' | 'verify' | 'fix_vote')
+async function idbQueueAction(action) {
+  if (!App.idb) return;
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readwrite');
+    const req = tx.objectStore('pending_queue').add({ ...action, queuedAt: Date.now() });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = e  => reject(e.target.error);
+  });
+}
+
+// Return all pending queued actions
+async function idbGetQueue() {
+  if (!App.idb) return [];
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readonly');
+    const req = tx.objectStore('pending_queue').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// Remove a flushed action from the queue by its auto-increment key
+async function idbClearQueueItem(qid) {
+  if (!App.idb) return;
+  return new Promise((resolve, reject) => {
+    const tx  = App.idb.transaction('pending_queue', 'readwrite');
+    const req = tx.objectStore('pending_queue').delete(qid);
+    req.onsuccess = () => resolve();
+    req.onerror   = e  => reject(e.target.error);
+  });
+}
+
+// Compute risk score from severity string
+function calcRisk(severity) {
+  if (severity === 'Dangerous') return 80 + Math.floor(Math.random()*15);
+  if (severity === 'Moderate')  return 50 + Math.floor(Math.random()*20);
+  return 20 + Math.floor(Math.random()*15);
+}
+
+/* ══════════════════════════════════════════
+   OFFLINE QUEUE — FLUSH ON RECONNECT
+   ──────────────────────────────────────────
+   Actions queued while offline are stored in
+   IDB and replayed to Firebase when back online.
+   ══════════════════════════════════════════ */
+async function flushPendingQueue() {
+  if (App.pendingFlush || DEMO_MODE || !App.db) return;
+  const queue = await idbGetQueue();
+  if (!queue.length) return;
+
+  App.pendingFlush = true;
+  toast(`📤 Syncing ${queue.length} offline report${queue.length>1?'s':''}...`, 'brand');
+
+  let succeeded = 0;
+  for (const action of queue) {
+    try {
+      if (action.type === 'add_pothole') {
+        await addPotholeToFirebase(action.data);
+      } else if (action.type === 'fix_vote') {
+        await App.db.collection('potholes').doc(action.id).update({
+          fixVotes: firebase.firestore.FieldValue.increment(1)
+        });
+      } else if (action.type === 'verify') {
+        await App.db.collection('potholes').doc(action.id).update({
+          reports: firebase.firestore.FieldValue.increment(1)
+        });
+      }
+      await idbClearQueueItem(action.qid);
+      succeeded++;
+    } catch(e) {
+      console.error('[SaveLYF] Failed to flush action:', action, e);
+    }
+  }
+
+  App.pendingFlush = false;
+  if (succeeded > 0) {
+    toast(`✅ ${succeeded} offline report${succeeded>1?'s':''} synced to Firebase!`, 'safe');
+  }
+}
+
+/* ══════════════════════════════════════════
+   FIREBASE SETUP (FREE SPARK PLAN)
+   ══════════════════════════════════════════ */
+async function initFirebase() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  App.db   = firebase.firestore();
+  App.auth = firebase.auth();
+
+  // Enable Firestore offline persistence — Firebase's own disk cache
+  // Works alongside our IDB layer for double-redundancy
+  try {
+    await App.db.enablePersistence({ synchronizeTabs: false });
+    console.log('[SaveLYF] Firestore offline persistence enabled');
+  } catch(e) {
+    if (e.code === 'failed-precondition') {
+      console.warn('[SaveLYF] Persistence limited — multiple tabs open');
+    } else if (e.code === 'unimplemented') {
+      console.warn('[SaveLYF] Persistence not supported in this browser');
+    }
+  }
+
+  // Anonymous auth (free, unlimited)
+  const result = await App.auth.signInAnonymously();
+  App.firebaseUser = result.user;
+  console.log('[SaveLYF] Firebase connected · UID:', result.user.uid);
+
+  // Seed data if first run
+  const snap = await App.db.collection('potholes').limit(1).get({ source: 'server' }).catch(() =>
+    App.db.collection('potholes').limit(1).get()
+  );
+  if (snap.empty) await seedFirebase();
+
+  // Start real-time listener — every snapshot also writes to IDB
+  listenFirebase();
+}
+
+function listenFirebase() {
+  App.db.collection('potholes').onSnapshot(snap => {
+    App.potholes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    App.syncedAt = Date.now();
+
+    // Mirror every snapshot to IndexedDB so the device stays current
+    idbSavePotholes(App.potholes).catch(e =>
+      console.warn('[SaveLYF] IDB save failed:', e)
+    );
+
+    refreshMapMarkers();
+    refreshInsights();
+    buildActivityBars();
+    refreshHazardList();
+    refreshAdminStats();
+    // Refresh admin table if admin is logged in
+    if (App.adminLoggedIn) {
+      refreshAdminTable();
+      refreshPendingRemoval();
+      refreshAccidentList();
+    }
+    updateSyncBadge();
+    console.log('[SaveLYF] Firebase→IDB sync:', App.potholes.length, 'potholes');
+  }, err => {
+    console.error('[SaveLYF] Firestore listener error:', err);
+    toast('⚠️ Firebase sync error — using cached data', 'warn');
+  });
+}
+
+async function seedFirebase() {
+  const batch = App.db.batch();
+  SEED_POTHOLES.forEach(p => {
+    const ref = App.db.collection('potholes').doc(p.id);
+    batch.set(ref, { ...p, createdAt: Date.now(), reportedBy: App.firebaseUser?.uid || 'system' });
+  });
+  await batch.commit();
+  console.log('[SaveLYF] Seeded Firebase with Gaborone data');
+}
+
+async function addPotholeToFirebase(data) {
+  if (!App.db) return;
+  await App.db.collection('potholes').add({
+    ...data, createdAt: Date.now(),
+    reportedBy: App.firebaseUser?.uid || 'anon',
+    verified: 0, risk: calcRisk(data.severity)
+  });
+}
+
+
+/* ══════════════════════════════════════════
+   DEMO MODE (no config.js — IDB only)
+   ══════════════════════════════════════════ */
+async function initDemoMode() {
+  console.log('[SaveLYF] Demo mode — IndexedDB only');
+
+  // Load from IDB first; fall back to SEED_POTHOLES if IDB is empty
+  const cached = await idbLoadPotholes().catch(() => []);
+  if (cached.length > 0) {
+    App.potholes = cached;
+    console.log('[SaveLYF] Demo: loaded', cached.length, 'potholes from IDB');
+  } else {
+    App.potholes = [...SEED_POTHOLES];
+    await idbSavePotholes(App.potholes).catch(() => {});
+  }
+}
+
+// Kept for compatibility — in live mode IDB handles persistence
+function saveDemoData() {
+  idbSavePotholes(App.potholes).catch(() => {
+    // IndexedDB fallback: localStorage as last resort
+    try { localStorage.setItem('safelyf_potholes_bk', JSON.stringify(App.potholes)); } catch(_){}
+  });
+}
+
+function addPotholeLocal(data) {
+  const id = 'u' + Date.now();
+  const newP = {
+    id, ...data, createdAt: Date.now(), reportedBy: 'local',
+    verified: 0, fixed: false, risk: calcRisk(data.severity)
+  };
+  App.potholes.push(newP);
+  idbSavePotholes(App.potholes).catch(() => {});
+  refreshMapMarkers();
+  refreshInsights();
+  refreshHazardList();
+  refreshAdminStats();
+}
+
+/* ══════════════════════════════════════════
+   LEAFLET MAP (FREE — OpenStreetMap/CartoDB)
+   ══════════════════════════════════════════ */
+function initMap() {
+  App.map = L.map('leafmap', {
+    center: [App.gps.lat, App.gps.lng],
+    zoom: 14, zoomControl: false,
+    attributionControl: true
+  });
+
+  // Dark tiles — CartoDB Dark Matter (FREE, no key)
+  App.tileDark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution:'© <a href="https://carto.com">CARTO</a> © <a href="https://openstreetmap.org">OSM</a>',
+      subdomains:'abcd', maxZoom:19 }
+  );
+
+  // Light tiles — CartoDB Positron (FREE, no key)
+  App.tileLight = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution:'© <a href="https://carto.com">CARTO</a> © <a href="https://openstreetmap.org">OSM</a>',
+      subdomains:'abcd', maxZoom:19 }
+  );
+
+  if (App.theme === 'dark') App.tileDark.addTo(App.map);
+  else App.tileLight.addTo(App.map);
+
+  // Heatmap circles (hidden by default)
+  const heatData = [
+    { lat:-24.6545, lng:25.9065, r:400, col:'#FF1744' },
+    { lat:-24.6080, lng:25.9300, r:350, col:'#FF1744' },
+    { lat:-24.6550, lng:25.8980, r:300, col:'#FFB300' },
+    { lat:-24.6700, lng:25.8950, r:280, col:'#FFB300' },
+    { lat:-24.6450, lng:25.8850, r:320, col:'#FF1744' },
+  ];
+  App.heatCircles = heatData.map(h => L.circle([h.lat,h.lng], {
+    radius:h.r, color:h.col, fillColor:h.col,
+    fillOpacity:.18, opacity:0, weight:0
+  }));
+
+  // Map click dismisses tooltip
+  App.map.on('click', () => document.getElementById('mtt').classList.remove('show'));
+
+  // Add accident markers
+  ACCIDENT_DATA.forEach(a => {
+    const icon = L.divIcon({
+      className:'', iconSize:[30,30], iconAnchor:[15,15],
+      html:`<div class="lm-acc" onclick="showTooltip(event,'${a.road}','Accident Reported',0,'–',90)">🚗</div>`
+    });
+    L.marker([a.lat,a.lng],{icon}).addTo(App.map);
+  });
+
+  // Initial user marker
+  addUserMarker(App.gps.lat, App.gps.lng);
+
+  // Load pothole markers
+  refreshMapMarkers();
+}
+
+function addUserMarker(lat, lng) {
+  if (App.userMarker) App.map.removeLayer(App.userMarker);
+  const icon = L.divIcon({
+    className:'', iconSize:[48,48], iconAnchor:[24,24],
+    html:`<div class="lm-user">
+      <div class="lm-uring"></div>
+      <div class="lm-uring r2"></div>
+      <div class="lm-udot"></div>
+    </div>`
+  });
+  App.userMarker = L.marker([lat,lng], { icon, zIndexOffset:1000 }).addTo(App.map);
+}
+
+function refreshMapMarkers() {
+  // Remove old markers
+  App.potholeMarkers.forEach(m => App.map.removeLayer(m));
+  App.potholeMarkers = [];
+
+  App.potholes.forEach(p => {
+    // Potholes pending admin removal are NOT shown to regular users on map
+    // They appear fixed (blue) only to admin users
+    const isRemoved = p.pendingRemoval && !App.adminLoggedIn;
+    if (isRemoved) return;
+
+    const cls = p.fixed || p.pendingRemoval || p.severity==='Fixed' ? 'fixed' :
+                p.severity === 'Dangerous' ? 'danger' :
+                p.severity === 'Moderate'  ? 'moderate' : 'low';
+    const glyph = cls==='danger'?'⚠':cls==='moderate'?'!':cls==='fixed'?'✓':'·';
+    const hasPulse = cls==='danger'||cls==='moderate';
+    const col = {danger:'#FF1744',moderate:'#FFB300',low:'#FF6F00',fixed:'#2962FF'}[cls];
+
+    const icon = L.divIcon({
+      className:'',
+      iconSize:[32,42], iconAnchor:[16,42],
+      html:`<div class="lm-pin lm-${cls}">
+        <div class="lm-head" data-glyph="${glyph}" style="background:${col}"></div>
+        ${hasPulse?`<div class="lm-ring" style="color:${col}"></div>`:''}
+      </div>`
+    });
+
+    const marker = L.marker([p.lat||0, p.lng||0], {icon}).addTo(App.map);
+    marker.on('click', e => showTooltip(e.originalEvent, p.road, p.severity, p.reports, calcDist(p), p.risk, p.id));
+    App.potholeMarkers.push(marker);
+  });
+}
+
+function showTooltip(e, road, sev, reports, dist, risk, id) {
+  const mtt = document.getElementById('mtt');
+  const col = {Dangerous:'var(--danger)',Moderate:'var(--warn)','Low Risk':'var(--tx-2)',Fixed:'var(--fixed)','Accident Reported':'var(--purple)'}[sev]||'var(--brand)';
+  document.getElementById('mtt-road').innerHTML = `<span style="color:${col}">${road}</span>`;
+  document.getElementById('mtt-det').innerHTML  = `Severity: <strong style="color:${col}">${sev}</strong><br>Reports: ${reports} · Distance: ${dist}<br>Risk Score: ${risk}/100`;
+  mtt._currentId = id;
+
+  // Position tooltip
+  const rect = document.getElementById('leafmap').getBoundingClientRect();
+  let x = (e?.clientX || rect.left + rect.width/2) - rect.left;
+  let y = (e?.clientY || rect.top  + rect.height/2) - rect.top;
+  x = Math.max(8, Math.min(x - 100, rect.width - 240));
+  y = Math.max(50, y - 150);
+  mtt.style.left = x + 'px';
+  mtt.style.top  = y + 'px';
+  mtt.classList.add('show');
+  setTimeout(() => mtt.classList.remove('show'), 6000);
+  e?.stopPropagation?.();
+
+  // Update top bar
+  document.getElementById('rp-road').textContent = road;
+  document.getElementById('rp-dist').textContent = sev === 'Fixed' ? '✓ Fixed road' : `${sev} · ${dist} away`;
+}
+
+function verifyHazard(status) {
+  document.getElementById('mtt').classList.remove('show');
+  const id = document.getElementById('mtt')._currentId;
+  if (status === 'fixed' && id) {
+    if (!App.adminLoggedIn) {
+      // Non-admin: submit a fix-vote locally + queue for Firebase
+      const p = App.potholes.find(x => x.id === id);
+      if (p) { p.fixVotes = (p.fixVotes || 0) + 1; }
+      idbSavePotholes(App.potholes).catch(() => {});
+      if (!DEMO_MODE && navigator.onLine && App.db) {
+        App.db.collection('potholes').doc(id).update({
+          fixVotes: firebase.firestore.FieldValue.increment(1)
+        });
+      } else if (!DEMO_MODE) {
+        idbQueueAction({ type: 'fix_vote', id }).catch(() => {});
+      }
+      toast('🔧 Fix report saved — will sync when online','warn');
+      App.userVerifications++;
+      document.getElementById('p-verif').textContent = App.userVerifications;
+      return;
+    }
+    // Admin: mark as fixed in Firebase permanently
+    const p = App.potholes.find(x => x.id === id);
+    if (p) { p.fixed = true; p.severity = 'Fixed'; p.risk = 0; }
+    if (!DEMO_MODE && navigator.onLine && App.db) {
+      App.db.collection('potholes').doc(id).update({
+        fixed: true, severity: 'Fixed', risk: 0,
+        fixedAt: Date.now(), fixedBy: App.adminRole
+      });
+      // IDB is updated by the Firebase snapshot listener
+    } else {
+      idbSavePotholes(App.potholes).catch(() => {});
+    }
+    refreshMapMarkers(); refreshInsights(); refreshAdminStats();
+    toast('✅ Pothole marked as FIXED in database — road cleared!','safe');
+    App.userVerifications++;
+    document.getElementById('p-verif').textContent = App.userVerifications;
+  } else {
+    // Verify still exists — increment report count
+    const p = App.potholes.find(x => x.id === id);
+    if (p) { p.reports++; }
+    idbSavePotholes(App.potholes).catch(() => {});
+    if (!DEMO_MODE && navigator.onLine && App.db) {
+      App.db.collection('potholes').doc(id).update({
+        reports: firebase.firestore.FieldValue.increment(1)
+      });
+    } else if (!DEMO_MODE) {
+      idbQueueAction({ type: 'verify', id }).catch(() => {});
+    }
+    refreshInsights();
+    toast('✅ Verification saved — pothole confirmed','safe');
+    App.userVerifications++;
+    document.getElementById('p-verif').textContent = App.userVerifications;
+  }
+}
+
+function recenterMap() {
+  if (App.map) App.map.setView([App.gps.lat, App.gps.lng], 14);
+  toast('◎ Recentered to your location','brand');
+}
+
+function calcDist(p) {
+  const d = haversine(App.gps.lat, App.gps.lng, p.lat, p.lng);
+  if (d < 1000) return Math.round(d) + 'm';
+  return (d/1000).toFixed(1) + 'km';
+}
+
+function toggleHeat() {
+  App.heatOn = !App.heatOn;
+  App.heatCircles.forEach(c => App.heatOn ? c.addTo(App.map) : App.map.removeLayer(c));
+  document.getElementById('heat-btn').textContent = App.heatOn ? '🗺️' : '🌡️';
+  toast(App.heatOn ? '🌡️ Heatmap visible — danger zones shown' : '🗺️ Standard view', 'brand');
+}
+
+function toggleLegend() {
+  App.legendOn = !App.legendOn;
+  document.getElementById('map-legend').classList.toggle('show', App.legendOn);
+}
+
+/* ══════════════════════════════════════════
+   GPS TRACKING (Real Browser Geolocation)
+   ══════════════════════════════════════════ */
+function requestGPS() {
+  document.getElementById('gps-prompt').classList.remove('show');
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-dot searching';
+  document.getElementById('gps-acc-txt').textContent = 'Acquiring…';
+
+  navigator.geolocation.getCurrentPosition(
+    pos => { handleGPS(pos); startGPSWatch(); },
+    err => {
+      console.warn('[SaveLYF] GPS error:', err.message);
+      dot.className = 'gps-dot';
+      document.getElementById('gps-acc-txt').textContent = 'GPS unavailable';
+      document.getElementById('st-gps-txt').textContent = 'NO GPS';
+      toast('📍 GPS unavailable — using Gaborone default position','warn');
+    },
+    { enableHighAccuracy:true, timeout:15000, maximumAge:5000 }
+  );
+}
+
+function startGPSWatch() {
+  if (App.gpsWatchId) navigator.geolocation.clearWatch(App.gpsWatchId);
+  App.gpsWatchId = navigator.geolocation.watchPosition(
+    handleGPS,
+    err => console.warn('[SaveLYF] GPS watch error:', err.message),
+    { enableHighAccuracy:true, timeout:10000, maximumAge:2000 }
+  );
+}
+
+function handleGPS(pos) {
+  const { latitude:lat, longitude:lng, speed, heading, accuracy } = pos.coords;
+
+  // Calculate speed from position delta if GPS speed is null
+  let spd = 0;
+  if (speed !== null && speed !== undefined) {
+    spd = speed * 3.6; // m/s → km/h
+  } else if (App.prevPos) {
+    const dist = haversine(App.prevPos.lat, App.prevPos.lng, lat, lng);
+    const dt = (pos.timestamp - App.prevTime) / 1000;
+    if (dt > 0) spd = Math.max(0, (dist / dt) * 3.6);
+  }
+
+  App.gps = { lat, lng, speed: Math.min(200, spd), heading, accuracy, valid: true };
+
+  // Compute heading from movement when GPS doesn't provide one
+  if (App.prevPos) {
+    const moveDist = haversine(App.prevPos.lat, App.prevPos.lng, lat, lng);
+    if (moveDist > 3) { // only update if moved at least 3m to avoid noise
+      App.calculatedHeading = bearingTo(App.prevPos.lat, App.prevPos.lng, lat, lng);
+    }
+  }
+  // Use GPS-provided heading if available, otherwise use calculated
+  if (heading !== null && heading !== undefined) {
+    App.gps.heading = heading;
+  } else {
+    App.gps.heading = App.calculatedHeading;
+  }
+
+  App.prevPos = { lat, lng };
+  App.prevTime = pos.timestamp;
+
+  // Update UI
+  updateUserMarker(lat, lng);
+  updateSpeedUI(spd);
+  updateDriveStats(lat, lng, spd, heading, accuracy);
+  checkProximityAlerts();
+
+  // GPS indicator
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-dot active';
+  document.getElementById('gps-acc-txt').textContent = `±${Math.round(accuracy)}m`;
+  document.getElementById('st-gps-txt').textContent = 'GPS ●';
+}
+
+function updateUserMarker(lat, lng) {
+  if (!App.map) return;
+  if (App.userMarker) {
+    App.userMarker.setLatLng([lat, lng]);
+  } else {
+    addUserMarker(lat, lng);
+  }
+}
+
+function updateSpeedUI(spd) {
+  const cls = spd < 60 ? 'spd-safe' : spd < 85 ? 'spd-warn' : 'spd-danger';
+  const n = Math.round(spd);
+  ['spd-num','drive-spd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = n; el.className = el.className.replace(/spd-\w+/, '') + ' ' + cls; }
+  });
+  // Speedometer arc (max 160 km/h)
+  const arc = document.getElementById('spd-arc');
+  if (arc) { const p = Math.min(spd / 160, 1); arc.setAttribute('stroke-dasharray', `${p * 494} 740`); }
+  // Danger needle
+  const needle = document.getElementById('dm-needle');
+  if (needle) { needle.style.left = (spd < 60 ? 8 : spd < 80 ? 40 : spd < 100 ? 65 : 85) + '%'; }
+  // Status tag
+  const tag = document.getElementById('spd-status-tag');
+  const ds  = document.getElementById('drive-status');
+  if (spd < 60) {
+    if (tag) { tag.className='tag tag-safe'; tag.textContent='SAFE'; }
+    if (ds)  { ds.textContent='● All Clear'; ds.className='speedo-status spd-safe'; }
+  } else if (spd < 85) {
+    if (tag) { tag.className='tag tag-warn'; tag.textContent='CAUTION'; }
+    if (ds)  { ds.textContent='⚡ Moderate Risk'; ds.className='speedo-status spd-warn'; }
+  } else {
+    if (tag) { tag.className='tag tag-danger'; tag.textContent='DANGER'; }
+    if (ds)  { ds.textContent='⚠ HIGH SPEED!'; ds.className='speedo-status spd-danger'; }
+  }
+}
+
+function updateDriveStats(lat, lng, spd, hdg, acc) {
+  const set = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('dc-lat', lat.toFixed(5));
+  set('dc-lng', lng.toFixed(5));
+  set('dc-acc', Math.round(acc));
+  set('dc-hdg', hdg !== null ? Math.round(hdg) + '°' : '–');
+}
+
+/* ══════════════════════════════════════════
+   BEARING & DIRECTION UTILITIES
+   ══════════════════════════════════════════ */
+function bearingTo(lat1, lng1, lat2, lng2) {
+  // Returns compass bearing (0–360°) from point 1 to point 2
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const φ1   = lat1 * Math.PI / 180;
+  const φ2   = lat2 * Math.PI / 180;
+  const y    = Math.sin(dLng) * Math.cos(φ2);
+  const x    = Math.cos(φ1)  * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function angularDiff(a, b) {
+  // Smallest angular difference between two bearings (0–180°)
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function isAhead(potholeLat, potholeLng) {
+  // Returns true if the pothole is within the forward cone (±90°) of travel.
+  // When speed is very low or heading is unknown, treat all potholes as ahead.
+  const heading = App.gps.heading;
+  if (heading === null || heading === undefined || App.gps.speed < 5) return true;
+  const bearing = bearingTo(App.gps.lat, App.gps.lng, potholeLat, potholeLng);
+  return angularDiff(heading, bearing) <= 90;
+}
+
+/* ══════════════════════════════════════════
+   PROXIMITY ALERTS
+   ══════════════════════════════════════════ */
+function checkProximityAlerts() {
+  if (!App.voiceOn || App.alertCooldown) return;
+
+  let closestAhead = null, closestDist = Infinity;
+
+  App.potholes.filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed').forEach(p => {
+    const dist = haversine(App.gps.lat, App.gps.lng, p.lat, p.lng);
+    // Only consider potholes within 500m that are in the direction of travel
+    if (dist < 500 && isAhead(p.lat, p.lng) && dist < closestDist) {
+      closestDist  = dist;
+      closestAhead = p;
+    }
+  });
+
+  if (closestAhead && closestAhead.id !== App.lastAlertId) {
+    triggerAlert(closestAhead, Math.round(closestDist));
+    App.lastAlertId = closestAhead.id;
+    App.alertCooldown = true;
+    setTimeout(() => { App.alertCooldown = false; App.lastAlertId = null; }, 45000);
+  }
+}
+
+function triggerAlert(p, dist) {
+  const isSerious = p.severity === 'Dangerous';
+
+  // Compute directional label for display
+  let dirLabel = 'ahead';
+  if (App.gps.heading !== null && App.gps.heading !== undefined && App.gps.speed >= 5) {
+    const bearing = bearingTo(App.gps.lat, App.gps.lng, p.lat, p.lng);
+    const diff    = angularDiff(App.gps.heading, bearing);
+    // Determine if it's slightly left, right, or straight ahead
+    const rel = ((bearing - App.gps.heading) + 360) % 360;
+    if (diff < 20)        dirLabel = 'straight ahead';
+    else if (rel < 180)   dirLabel = 'ahead-right';
+    else                  dirLabel = 'ahead-left';
+  }
+
+  const slide = document.getElementById('alert-slide');
+  slide.className = 'alert-slide show ' + (isSerious ? 'alert-danger-bg' : 'alert-warn-bg');
+  document.getElementById('al-title').textContent = p.severity.toUpperCase() + ' POTHOLE';
+  document.getElementById('al-sub').textContent   = `${dist}m ${dirLabel} · ${p.road}`;
+  setTimeout(() => slide.classList.remove('show'), 7000);
+
+  // Update bottom bar
+  document.getElementById('spd-road').textContent   = p.road;
+  document.getElementById('spd-hazard').textContent = `${isSerious?'⚠':'!'} Pothole ${dist}m ${dirLabel}`;
+
+  // Voice
+  const msg = `Warning! ${p.severity} pothole ${dirLabel} on ${p.road} in ${dist} meters. Please reduce your speed.`;
+  speak(msg, isSerious);
+
+  // Voice popup
+  document.getElementById('vp-msg').textContent = msg;
+  document.getElementById('vp-sub').textContent = `Speed: ${Math.round(App.gps.speed)} km/h · ${p.severity}`;
+  const vp = document.getElementById('voice-popup');
+  vp.classList.add('show');
+  setTimeout(() => vp.classList.remove('show'), 5500);
+  App.alertsGiven++;
+}
+
+function closeAlert() { document.getElementById('alert-slide').classList.remove('show'); }
+
+/* ══════════════════════════════════════════
+   VOICE ALERTS (Web Speech API — FREE)
+   ══════════════════════════════════════════ */
+function speak(text, urgent) {
+  if (!App.voiceOn || !('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate  = urgent ? 0.88 : 0.92;
+  u.pitch = 1.05;
+  u.volume = 0.95;
+  const voices = speechSynthesis.getVoices();
+  const eng = voices.find(v => v.lang.startsWith('en')) || voices[0];
+  if (eng) u.voice = eng;
+  speechSynthesis.speak(u);
+  const btn = document.getElementById('voice-btn');
+  if (btn) { btn.classList.add('speaking'); setTimeout(() => btn.classList.remove('speaking'), 4500); }
+}
+
+function toggleVoice() {
+  App.voiceOn = !App.voiceOn;
+  const btn = document.getElementById('voice-btn');
+  if (btn) { btn.textContent = App.voiceOn ? '🔊' : '🔇'; btn.classList.toggle('muted', !App.voiceOn); }
+  document.getElementById('voice-label').textContent = App.voiceOn ? 'ON' : 'OFF';
+  toast(App.voiceOn ? '🔊 Voice alerts enabled' : '🔇 Voice muted','brand');
+}
+
+/* ══════════════════════════════════════════
+   REPORTING
+   ══════════════════════════════════════════ */
+function openReportModal() {
+  document.getElementById('report-modal').classList.add('show');
+  document.getElementById('f-gps').textContent = `${App.gps.lat.toFixed(5)}, ${App.gps.lng.toFixed(5)}`;
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function setSev(s) {
+  App.selectedSev = s;
+  ['dangerous','moderate','low'].forEach(x => {
+    const el = document.getElementById('sev-'+x);
+    el.className = 'sev-opt' + (x===s ? ' sel-'+({dangerous:'danger',moderate:'warn',low:'low'}[x]) : '');
+  });
+}
+
+async function submitReport() {
+  const road = document.getElementById('f-road').value.trim() || 'Unknown Road';
+  const notes = document.getElementById('f-notes').value.trim();
+  const sevMap = { dangerous:'Dangerous', moderate:'Moderate', low:'Low Risk' };
+  const data = {
+    lat: App.gps.lat,
+    lng: App.gps.lng,
+    road, severity: sevMap[App.selectedSev],
+    reports: 1, notes
+  };
+
+  closeModal('report-modal');
+  document.getElementById('f-road').value  = '';
+  document.getElementById('f-notes').value = '';
+
+  if (!DEMO_MODE) {
+    if (navigator.onLine && App.db) {
+      // Online — write directly to Firebase (snapshot listener updates IDB)
+      await addPotholeToFirebase(data);
+      toast(`📍 "${road}" sent to Firebase!`, 'safe');
+    } else {
+      // Offline — save to IDB immediately + queue for Firebase later
+      addPotholeLocal(data);
+      await idbQueueAction({ type: 'add_pothole', data }).catch(() => {});
+      toast(`📴 "${road}" saved to device — will sync when online`, 'warn');
+    }
+  } else {
+    addPotholeLocal(data);
+    toast(`📍 "${road}" saved to device (Demo Mode)`, 'brand');
+  }
+
+  App.userReports++;
+  document.getElementById('p-reports').textContent = App.userReports;
+  addPoints(50);
+  // Sync report count to Firestore user profile
+  if (App.userProfile && App.db && navigator.onLine) {
+    App.db.collection('users').doc(App.firebaseUser.uid).update({
+      reports: firebase.firestore.FieldValue.increment(1),
+      points:  firebase.firestore.FieldValue.increment(50)
+    }).catch(() => {});
+  }
+}
+
+/* ══════════════════════════════════════════
+   EMERGENCY SOS
+   ══════════════════════════════════════════ */
+function triggerEmergency() {
+  App.emCount = 10;
+  document.getElementById('em-count').textContent = 10;
+  document.getElementById('em-overlay').classList.add('show');
+  clearInterval(App.emTimer);
+  App.emTimer = setInterval(() => {
+    App.emCount--;
+    document.getElementById('em-count').textContent = App.emCount;
+    if (App.emCount <= 0) { clearInterval(App.emTimer); sendSOS(); }
+  }, 1000);
+}
+
+function cancelEM() {
+  clearInterval(App.emTimer);
+  document.getElementById('em-overlay').classList.remove('show');
+  toast('✅ Emergency cancelled — glad you are safe!','safe');
+}
+
+function sendSOS() {
+  clearInterval(App.emTimer);
+  document.getElementById('em-overlay').classList.remove('show');
+  // Open phone dialer (real emergency call)
+  window.location.href = 'tel:999';
+  toast(`🆘 Emergency SOS sent · GPS: ${App.gps.lat.toFixed(4)}, ${App.gps.lng.toFixed(4)}`,'danger');
+  setTimeout(() => toast('📍 Location shared with emergency services','danger'), 1200);
+}
+
+/* ══════════════════════════════════════════
+   NAVIGATION
+   ══════════════════════════════════════════ */
+function goPage(name, navId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('pg-'+name);
+  if (pg) pg.classList.add('active');
+  const ni = document.getElementById(navId);
+  if (ni) ni.classList.add('active');
+  if (name === 'insights') { refreshInsights(); buildActivityBars(); }
+  if (name === 'profile')  initProfile();
+  if (name === 'admin')    initAdmin();
+  if (name === 'drive')    refreshHazardList();
+  // Force map resize when returning to dashboard
+  if (name === 'dashboard' && App.map) setTimeout(() => App.map.invalidateSize(), 100);
+}
+
+function requestAdmin() {
+  if (App.adminLoggedIn) { goPage('admin','nav-admin'); }
+  else { document.getElementById('auth-screen').classList.add('show'); }
+}
+
+/* ══════════════════════════════════════════
+   AUTH
+   ══════════════════════════════════════════ */
+let _authRole = 'official';
+function selectRole(el, role) {
+  document.querySelectorAll('.auth-role').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  _authRole = role;
+}
+
+/* ══════════════════════════════════════════
+   AUTH — ADMIN PORTAL
+   Credentials loaded from config.js (not visible in app)
+   Two passwords per role — both accepted
+   ══════════════════════════════════════════ */
+function doLogin() {
+  const u   = document.getElementById('auth-user').value.trim().toLowerCase();
+  const p   = document.getElementById('auth-pass').value;
+  const err = document.getElementById('auth-err');
+  const btn = document.querySelector('#auth-screen .btn-brand');
+  btn.textContent = 'Verifying…';
+  btn.disabled = true;
+
+  // Credentials come from config.js → window.SAVELYF_CONFIG.adminCredentials
+  // Format: { role: { users:['u1','u2'], passwords:['p1','p2'] } }
+  const creds = (window.SAVELYF_CONFIG && window.SAVELYF_CONFIG.adminCredentials) || {};
+  const roleKey = _authRole; // 'official' | 'engineer' | 'analyst' | 'super'
+  const roleCred = creds[roleKey] || {};
+  const validUsers = (roleCred.users || []).map(x => x.toLowerCase());
+  const validPasses = roleCred.passwords || [];
+
+  // Small artificial delay for security feel
+  setTimeout(() => {
+    const userOk = validUsers.length > 0 ? validUsers.includes(u) : false;
+    const passOk = validPasses.length > 0 ? validPasses.includes(p) : false;
+
+    if (userOk && passOk) {
+      App.adminLoggedIn = true;
+      App.adminRole = roleKey;
+      document.getElementById('auth-screen').classList.remove('show');
+      err.classList.remove('show');
+      document.getElementById('auth-user').value = '';
+      document.getElementById('auth-pass').value = '';
+      const roleLabel = {official:'Gov Official',engineer:'Road Engineer',analyst:'Data Analyst',super:'Super Admin'}[roleKey];
+      document.getElementById('admin-role-display').textContent = roleLabel;
+      initAdmin();
+      goPage('admin', 'nav-admin');
+      toast('🔐 ' + roleLabel + ' access granted', 'safe');
+    } else {
+      err.classList.add('show');
+      // Clear password on failure for security
+      document.getElementById('auth-pass').value = '';
+    }
+    btn.textContent = 'Sign In Securely →';
+    btn.disabled = false;
+  }, 700);
+}
+
+function doLogout() {
+  App.adminLoggedIn = false;
+  App.adminRole = null;
+  document.getElementById('admin-role-display').textContent = 'Gov Official';
+  goPage('dashboard', 'nav-map');
+  toast('🔒 Logged out securely', 'brand');
+}
+
+document.getElementById('auth-screen').addEventListener('click', e => {
+  if (e.target === document.getElementById('auth-screen'))
+    document.getElementById('auth-screen').classList.remove('show');
+});
+
+/* ══════════════════════════════════════════
+   THEME
+   ══════════════════════════════════════════ */
+function toggleTheme() {
+  App.theme = App.theme === 'dark' ? 'day' : 'dark';
+  document.documentElement.setAttribute('data-theme', App.theme);
+  document.getElementById('theme-btn').textContent = App.theme === 'dark' ? '🌙' : '☀️';
+  document.getElementById('theme-meta').content = App.theme === 'dark' ? '#1C1C1E' : '#F0EDE6';
+
+  if (App.map) {
+    if (App.theme === 'dark') { App.map.removeLayer(App.tileLight); App.tileDark.addTo(App.map); }
+    else { App.map.removeLayer(App.tileDark); App.tileLight.addTo(App.map); }
+  }
+  toast(App.theme === 'dark' ? '🌙 Night mode' : '☀️ Day mode', 'brand');
+}
+
+/* ══════════════════════════════════════════
+   INSIGHTS PAGE
+   ══════════════════════════════════════════ */
+function initInsights() {
+  refreshInsights();
+  buildActivityBars();
+}
+
+function buildActivityBars() {
+  const bars = document.getElementById('act-bars');
+  const lbls = document.getElementById('act-lbls');
+  if (!bars) return;
+  bars.innerHTML = '';
+  lbls.innerHTML = '';
+
+  // Count pothole reports per day of the week from real createdAt timestamps
+  const counts = [0,0,0,0,0,0,0]; // Sun=0..Sat=6
+  App.potholes.forEach(p => {
+    if (p.createdAt) {
+      const d = new Date(p.createdAt).getDay();
+      counts[d]++;
+    }
+  });
+  // Reorder Mon-Sun
+  const ordered = [counts[1],counts[2],counts[3],counts[4],counts[5],counts[6],counts[0]];
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dayLabels = ['M','T','W','T','F','S','S'];
+  const maxV = Math.max(...ordered, 1);
+  ordered.forEach((v,i) => {
+    const pct = (v/maxV);
+    const col = pct > 0.7 ? '#FF1744' : pct > 0.4 ? '#FFB300' : '#2979FF';
+    const b = document.createElement('div');
+    b.className = 'act-bar';
+    b.style.cssText = `height:${(pct*66)+4}px;background:${col};`;
+    b.onclick = () => toast(`${dayNames[i]}: ${v} report${v!==1?'s':''}`, 'brand');
+    bars.appendChild(b);
+    const l = document.createElement('div');
+    l.className = 'act-lbl';
+    l.textContent = dayLabels[i];
+    lbls.appendChild(l);
+  });
+}
+
+function refreshInsights() {
+  const dangerous = App.potholes.filter(p => p.severity==='Dangerous' && !p.fixed).length;
+  const moderate  = App.potholes.filter(p => p.severity==='Moderate'  && !p.fixed).length;
+  const fixed     = App.potholes.filter(p => p.severity==='Fixed' || p.fixed).length;
+  const total     = App.potholes.length;
+
+  const s = id => document.getElementById(id);
+  if (s('ins-danger'))   s('ins-danger').textContent   = dangerous;
+  if (s('ins-moderate')) s('ins-moderate').textContent = moderate;
+  if (s('ins-fixed'))    s('ins-fixed').textContent    = fixed;
+  if (s('ins-total'))    s('ins-total').textContent    = total;
+
+  // Risk bars
+  const rb = document.getElementById('risk-bars');
+  if (rb) {
+    rb.innerHTML = '';
+    const sorted = [...App.potholes].filter(p=>!p.fixed).sort((a,b)=>(b.risk||0)-(a.risk||0)).slice(0,6);
+    sorted.forEach(p => {
+      const col = (p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)';
+      rb.innerHTML += `<div class="bar-row">
+        <span class="br-lbl">${p.road}</span>
+        <div class="br-track"><div class="br-fill" style="width:${p.risk||0}%;background:${col}"></div></div>
+        <span class="br-val" style="color:${col}">${p.risk||0}</span>
+      </div>`;
+    });
+  }
+
+  // Risk table
+  const tb = document.getElementById('risk-tbody');
+  if (tb) {
+    tb.innerHTML = '';
+    const rows = [...App.potholes].sort((a,b)=>(b.risk||0)-(a.risk||0)).slice(0,8);
+    rows.forEach(p => {
+      const sev = p.fixed ? 'Fixed' : p.severity;
+      const cls = {Dangerous:'tag-danger',Moderate:'tag-warn','Low Risk':'tag-warn',Fixed:'tag-fixed'}[sev]||'tag-brand';
+      const col = (p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)';
+      tb.innerHTML += `<tr>
+        <td style="font-weight:700">${p.road}</td>
+        <td><span class="tag ${cls}">${sev}</span></td>
+        <td style="font-family:var(--mono);font-weight:700">${p.reports||0}</td>
+        <td style="font-family:var(--mono);font-weight:700;color:${col}">${p.risk||0}</td>
+        <td style="color:var(--tx-2);font-family:var(--mono);font-size:10.5px">${calcDist(p)}</td>
+      </tr>`;
+    });
+  }
+}
+
+/* ══════════════════════════════════════════
+   PROFILE PAGE
+   ══════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   PROFILE PAGE — FULLY LIVE
+   ══════════════════════════════════════════ */
+function initProfile() {
+  updateProfileUI();
+  loadLeaderboard();
+}
+
+function updateProfileUI() {
+  const hasProfile = !!App.userProfile;
+  const anonPrompt = document.getElementById('anon-prompt');
+  const ptsSection = document.getElementById('pts-section');
+  const signoutWrap = document.getElementById('signout-wrap');
+
+  if (hasProfile) {
+    anonPrompt.style.display = 'none';
+    ptsSection.style.display = 'block';
+    signoutWrap.style.display = 'block';
+    document.getElementById('p-av').textContent = App.userProfile.avatar || '👤';
+    document.getElementById('p-name').textContent = App.userProfile.displayName || 'Driver';
+    document.getElementById('p-mode').textContent = (App.userProfile.role || 'Community Reporter') + ' · Gaborone';
+  } else {
+    anonPrompt.style.display = 'block';
+    ptsSection.style.display = 'none';
+    signoutWrap.style.display = 'none';
+    document.getElementById('p-av').textContent = '👤';
+    document.getElementById('p-name').textContent = 'Anonymous Driver';
+    document.getElementById('p-mode').textContent = 'Community Reporter · Gaborone';
+  }
+
+  // Always show live session stats
+  const pts = App.sessionPoints || 0;
+  const reports = App.userReports || 0;
+  const verifs  = App.userVerifications || 0;
+  document.getElementById('p-reports').textContent = reports;
+  document.getElementById('p-verif').textContent   = verifs;
+  document.getElementById('p-saves').textContent   = Math.floor(reports * 0.7 + verifs * 0.3);
+  document.getElementById('p-pts').textContent     = pts.toLocaleString();
+
+  // Level calculation
+  const levelThresholds = [0,100,300,600,1000,1600,2400,3400,4600,6000];
+  let level = 1;
+  const levelNames = ['New Driver','Road Scout','Alert Driver','Road Guardian','Hazard Hunter','Safety Champion','Road Warrior','Expert Navigator','Road Master','SaveLYF Legend'];
+  for (let i = levelThresholds.length-1; i >= 0; i--) {
+    if (pts >= levelThresholds[i]) { level = i+1; break; }
+  }
+  const nextLvl = levelThresholds[level] || levelThresholds[levelThresholds.length-1];
+  const currLvl = levelThresholds[level-1] || 0;
+  const pct = Math.min(100, Math.round(((pts - currLvl) / (nextLvl - currLvl)) * 100));
+  const lvlFill = document.getElementById('lvl-fill');
+  const lvlInfo = document.getElementById('lvl-info');
+  if (lvlFill) lvlFill.style.width = pct + '%';
+  if (lvlInfo) lvlInfo.innerHTML = `<span>Level ${level} · ${levelNames[Math.min(level-1, levelNames.length-1)]}</span><span>${pts - currLvl} / ${nextLvl - currLvl} to Level ${level+1}</span>`;
+
+  // Render dynamic badges
+  renderBadges(reports, verifs, pts);
+}
+
+function renderBadges(reports, verifs, pts) {
+  const grid = document.getElementById('badge-grid');
+  if (!grid) return;
+  const BADGES = [
+    { id:'first',  ic:'🏅', nm:'First Report',  req: reports >= 1,          tip:'Submit your first report' },
+    { id:'scout',  ic:'🚗', nm:'Road Scout',    req: reports >= 5,          tip:'Submit 5 reports' },
+    { id:'alert',  ic:'⚡', nm:'Quick Alert',   req: App.alertsGiven >= 3,  tip:'Receive 3 pothole alerts' },
+    { id:'guard',  ic:'🛡️', nm:'Guardian',      req: verifs >= 3,           tip:'Verify 3 hazards' },
+    { id:'star',   ic:'🌟', nm:'Star Driver',   req: reports >= 10,         tip:'Submit 10 reports' },
+    { id:'mapper', ic:'🗺️', nm:'Map Maker',     req: reports >= 20,         tip:'Submit 20 reports' },
+    { id:'champ',  ic:'🏆', nm:'Champion',      req: pts >= 1000,           tip:'Earn 1000 SafePoints' },
+    { id:'king',   ic:'👑', nm:'Road King',     req: pts >= 3000,           tip:'Earn 3000 SafePoints' },
+  ];
+  grid.innerHTML = BADGES.map(b => `
+    <div class="badge ${b.req ? 'earned' : 'locked'}" title="${b.tip}">
+      <div class="badge-ic">${b.ic}</div>
+      <div class="badge-nm">${b.nm}</div>
+      ${b.req ? '' : '<div style="font-size:8px;color:var(--tx-3);margin-top:2px">Locked</div>'}
+    </div>`).join('');
+}
+
+async function loadLeaderboard() {
+  const lb = document.getElementById('lb-list');
+  const lbLoad = document.getElementById('lb-loading');
+  if (!lb) return;
+
+  lb.innerHTML = '';
+  if (lbLoad) lbLoad.textContent = 'Loading…';
+
+  // Fetch from Firebase if available, otherwise show session only
+  let users = [];
+  if (!DEMO_MODE && App.db && navigator.onLine) {
+    try {
+      const snap = await App.db.collection('users').orderBy('points','desc').limit(10).get();
+      users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+      console.warn('[SaveLYF] Leaderboard fetch failed:', e);
+    }
+  }
+
+  // If no Firebase users, show local session as only entry
+  if (users.length === 0) {
+    const myPts = App.sessionPoints || 0;
+    const myName = App.userProfile?.displayName || 'You (Anonymous)';
+    users = [{ id: App.firebaseUser?.uid || 'local', displayName: myName, points: myPts, me: true }];
+  } else {
+    // Mark which entry is the current user
+    const myUid = App.firebaseUser?.uid;
+    users = users.map(u => ({ ...u, me: u.id === myUid }));
+    // Insert self if not in top 10
+    if (!users.find(u => u.me) && App.userProfile) {
+      users.push({ id: myUid, displayName: App.userProfile.displayName, points: App.sessionPoints || 0, me: true, tail: true });
+    }
+  }
+
+  if (lbLoad) lbLoad.textContent = '';
+  const rc = {0:'gold', 1:'silver', 2:'bronze'};
+  lb.innerHTML = users.map((u,i) => `
+    <div class="lb-item${u.me ? ' me' : ''}">
+      <div class="lb-rank ${rc[i] || ''}">${u.tail ? '–' : i+1}</div>
+      <div style="font-size:18px">👤</div>
+      <div class="lb-name">${u.displayName || 'Driver'}${u.me ? ' <span class="tag tag-brand" style="font-size:9px">YOU</span>' : ''}</div>
+      <div class="lb-pts">${(u.points || 0).toLocaleString()}</div>
+    </div>`).join('');
+}
+
+/* ── Profile creation / sign-in modal ── */
+let _pmMode = 'signup'; // 'signup' | 'signin'
+
+function openProfileModal(mode) {
+  _pmMode = mode || 'signup';
+  document.getElementById('pm-title').textContent  = _pmMode === 'signup' ? 'Create Profile' : 'Sign In';
+  document.getElementById('pm-sub').textContent    = _pmMode === 'signup' ? 'Join the SaveLYF community · Free' : 'Welcome back!';
+  document.getElementById('pm-submit').textContent = _pmMode === 'signup' ? 'Create Profile →' : 'Sign In →';
+  document.getElementById('pm-toggle').innerHTML   = _pmMode === 'signup'
+    ? 'Already have an account? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Sign In instead</span>'
+    : 'New here? <span style="color:var(--brand);cursor:pointer" onclick="toggleProfileModal()">Create a Profile</span>';
+  const signupFields = document.getElementById('pm-signup-fields');
+  if (signupFields) signupFields.style.display = _pmMode === 'signup' ? 'block' : 'none';
+  const pmErr = document.getElementById('pm-err');
+  if (pmErr) { pmErr.style.display='none'; pmErr.textContent=''; }
+  document.getElementById('profile-modal').classList.add('show');
+}
+
+function toggleProfileModal() {
+  openProfileModal(_pmMode === 'signup' ? 'signin' : 'signup');
+}
+
+async function submitProfileModal() {
+  const email = document.getElementById('pm-email').value.trim();
+  const pass  = document.getElementById('pm-pass').value;
+  const name  = _pmMode === 'signup' ? (document.getElementById('pm-name')?.value.trim() || '') : '';
+  const pmErr = document.getElementById('pm-err');
+  const btn   = document.getElementById('pm-submit');
+
+  if (!email || !pass) { showPmErr('Please fill in all fields'); return; }
+  if (_pmMode === 'signup' && !name) { showPmErr('Please enter a display name'); return; }
+  if (pass.length < 6) { showPmErr('Password must be at least 6 characters'); return; }
+
+  btn.textContent = _pmMode === 'signup' ? 'Creating…' : 'Signing in…';
+  btn.disabled = true;
+
+  try {
+    if (!App.auth) throw new Error('Firebase Auth not available');
+    let cred;
+    if (_pmMode === 'signup') {
+      cred = await App.auth.createUserWithEmailAndPassword(email, pass);
+      // Save profile to Firestore
+      const profile = {
+        displayName: name,
+        avatar: '👤',
+        role: 'Community Reporter',
+        email: email,
+        points: 0,
+        reports: 0,
+        verifications: 0,
+        createdAt: Date.now()
+      };
+      await App.db.collection('users').doc(cred.user.uid).set(profile);
+      App.userProfile = profile;
+      toast('🎉 Profile created — welcome to SaveLYF!', 'safe');
+    } else {
+      cred = await App.auth.signInWithEmailAndPassword(email, pass);
+      const doc = await App.db.collection('users').doc(cred.user.uid).get();
+      App.userProfile = doc.exists ? doc.data() : { displayName: email.split('@')[0], points: 0 };
+      toast('👋 Welcome back, ' + App.userProfile.displayName + '!', 'safe');
+    }
+    App.firebaseUser = cred.user;
+    closeModal('profile-modal');
+    document.getElementById('pm-email').value = '';
+    document.getElementById('pm-pass').value  = '';
+    if (document.getElementById('pm-name')) document.getElementById('pm-name').value = '';
+    updateProfileUI();
+    loadLeaderboard();
+  } catch(e) {
+    const msgs = {
+      'auth/email-already-in-use': 'Email already in use. Try signing in instead.',
+      'auth/user-not-found':       'No account found. Please create a profile.',
+      'auth/wrong-password':       'Incorrect password. Please try again.',
+      'auth/invalid-email':        'Please enter a valid email address.',
+      'auth/network-request-failed': 'Network error. Please check your connection.',
+    };
+    showPmErr(msgs[e.code] || e.message || 'An error occurred. Please try again.');
+  }
+  btn.textContent = _pmMode === 'signup' ? 'Create Profile →' : 'Sign In →';
+  btn.disabled = false;
+}
+
+function showPmErr(msg) {
+  const el = document.getElementById('pm-err');
+  if (el) { el.textContent = '❌ ' + msg; el.style.display = 'block'; }
+}
+
+async function signOutProfile() {
+  if (App.auth) await App.auth.signOut().catch(() => {});
+  App.userProfile = null;
+  updateProfileUI();
+  toast('🔒 Signed out of profile', 'brand');
+}
+
+function shareProfile() {
+  const name = App.userProfile?.displayName || 'Anonymous Driver';
+  const pts  = App.sessionPoints || 0;
+  const text = `I'm ${name} on SaveLYF — ${pts} SafePoints earned keeping Gaborone roads safe! 🛡️`;
+  if (navigator.share) {
+    navigator.share({ title: 'SaveLYF Profile', text, url: location.href }).catch(() => {});
+  } else {
+    navigator.clipboard?.writeText(text).then(() => toast('📋 Profile copied to clipboard!','safe')).catch(() => toast('📤 ' + text,'brand'));
+  }
+}
+
+function addPoints(pts) {
+  App.sessionPoints = (App.sessionPoints || 0) + pts;
+  // Sync points to Firestore if signed in
+  if (App.userProfile && App.db && navigator.onLine) {
+    App.db.collection('users').doc(App.firebaseUser.uid).update({
+      points: firebase.firestore.FieldValue.increment(pts),
+      reports: firebase.firestore.FieldValue.increment(0) // keep alive
+    }).catch(() => {});
+  }
+}
+
+/* ══════════════════════════════════════════
+   HAZARD LIST (Drive page)
+   ══════════════════════════════════════════ */
+function initHazardList() { refreshHazardList(); }
+
+function refreshHazardList() {
+  const list = document.getElementById('hazard-list');
+  if (!list) return;
+  const sorted = [...App.potholes]
+    .filter(p => !p.fixed && p.severity !== 'Fixed')
+    .map(p => ({ ...p, dist: haversine(App.gps.lat, App.gps.lng, p.lat, p.lng) }))
+    .sort((a,b) => a.dist - b.dist).slice(0,5);
+
+  list.innerHTML = sorted.map(p => {
+    const col = p.severity==='Dangerous'?'var(--danger)':p.severity==='Moderate'?'var(--warn)':'var(--tx-2)';
+    const dot = p.severity==='Dangerous'?'#FF1744':p.severity==='Moderate'?'#FFB300':'#FF6F00';
+    return `<div class="hz-item">
+      <div class="hz-dot" style="background:${dot}"></div>
+      <div class="hz-body">
+        <div class="hz-road">${p.road}</div>
+        <div class="hz-dist">${p.dist < 1000 ? Math.round(p.dist)+'m' : (p.dist/1000).toFixed(1)+'km'} away</div>
+      </div>
+      <span class="hz-sev" style="color:${col}">${p.severity}</span>
+    </div>`;
+  }).join('') || '<div style="padding:12px 16px;color:var(--tx-3);font-size:12px">No hazards nearby — road looks clear ✅</div>';
+}
+
+/* ══════════════════════════════════════════
+   ADMIN PAGE — FULLY LIVE
+   ══════════════════════════════════════════ */
+function initAdmin() {
+  if (!App.adminLoggedIn) return;
+  startAdminCountdown();
+  refreshAdminTable();       // always re-render (no _init guard)
+  refreshPendingRemoval();   // pending removal queue
+  refreshAccidentList();     // live accident list from potholes
+  refreshAdminStats();
+}
+
+function startAdminCountdown() {
+  // 30-day data retention timer
+  const future = new Date(Date.now() + 30*86400000);
+  const el = document.getElementById('admin-cd');
+  if (!el) return;
+  clearInterval(App._adminTimer);
+  App._adminTimer = setInterval(() => {
+    const d = future - Date.now();
+    if (d < 0) { el.textContent = 'Purging…'; return; }
+    const days = Math.floor(d/86400000);
+    const hh = String(Math.floor((d%86400000)/3600000)).padStart(2,'0');
+    const mm = String(Math.floor((d%3600000)/60000)).padStart(2,'0');
+    const ss = String(Math.floor((d%60000)/1000)).padStart(2,'0');
+    el.textContent = `${days}d ${hh}:${mm}:${ss}`;
+  }, 1000);
+}
+
+function refreshAdminStats() {
+  const s = id => document.getElementById(id);
+  const active   = App.potholes.filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed').length;
+  const urgent   = App.potholes.filter(p => (p.risk||0) >= 80 && !p.fixed && !p.pendingRemoval).length;
+  const pending  = App.potholes.filter(p => p.pendingRemoval).length;
+  const accidents= ACCIDENT_DATA.length;
+  if (s('as-total'))     s('as-total').textContent     = active;
+  if (s('as-urgent'))    s('as-urgent').textContent    = urgent;
+  if (s('as-fixed'))     s('as-fixed').textContent     = pending;
+  if (s('as-accidents')) s('as-accidents').textContent = accidents;
+  if (s('ins-total'))    s('ins-total').textContent    = App.potholes.length;
+}
+
+function refreshAdminTable() {
+  const tb = document.getElementById('admin-tbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+
+  // Only show active (not fixed, not pendingRemoval)
+  const data = [...App.potholes]
+    .filter(p => !p.fixed && !p.pendingRemoval && p.severity !== 'Fixed')
+    .sort((a,b) => (b.risk||0) - (a.risk||0))
+    .slice(0, 20); // show up to 20
+
+  const priClass = r => r>80?'pri-urgent':r>60?'pri-high':r>40?'pri-medium':'pri-low';
+  const priLabel = r => r>80?'URGENT':r>60?'HIGH':r>40?'MEDIUM':'LOW';
+
+  if (data.length === 0) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--tx-3)">No active hazards — all roads clear ✅</td></tr>';
+    return;
+  }
+
+  data.forEach((p,i) => {
+    const fv = p.fixVotes || 0;
+    const col = (p.risk||0)>75?'var(--danger)':(p.risk||0)>50?'var(--warn)':'var(--safe)';
+    tb.innerHTML += `<tr>
+      <td style="font-family:var(--mono)">${i+1}</td>
+      <td style="font-weight:700">${p.road}</td>
+      <td style="color:var(--tx-2)">Gaborone</td>
+      <td style="font-family:var(--mono);color:var(--brand)">${p.reports||0}</td>
+      <td><span class="pri ${priClass(p.risk||0)}">${priLabel(p.risk||0)}</span>${fv>0?`<br><span style="font-size:9px;color:var(--safe)">🔧 ${fv} fix vote${fv>1?'s':''}</span>`:''}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${col}">${p.risk||0}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-safe btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminIssueRepair('${p.id}','${p.road}')">Issue</button>
+        <button class="btn btn-brand btn-sm" style="font-size:10px;padding:5px 9px" onclick="adminMarkFixed('${p.id}','${p.road}')">✓ Fixed</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function refreshPendingRemoval() {
+  const card = document.getElementById('pending-removal-card');
+  const tb   = document.getElementById('pending-removal-tbody');
+  if (!card || !tb) return;
+
+  const pending = App.potholes.filter(p => p.pendingRemoval);
+  card.style.display = pending.length > 0 ? 'block' : 'none';
+  tb.innerHTML = '';
+
+  // Only engineer or super admin can confirm removal
+  const canRemove = ['engineer','super'].includes(App.adminRole);
+
+  pending.forEach(p => {
+    const when = p.fixedAt ? new Date(p.fixedAt).toLocaleDateString('en-BW') : '–';
+    tb.innerHTML += `<tr>
+      <td style="font-weight:700">${p.road}</td>
+      <td style="color:var(--tx-2);font-size:11px">${when}</td>
+      <td style="font-family:var(--mono);color:var(--safe)">${p.fixVotes||0}</td>
+      <td style="color:var(--tx-2);font-size:11px">${p.fixedBy||'Admin'}</td>
+      <td>
+        ${canRemove
+          ? `<button class="btn btn-danger btn-sm" style="font-size:10px" onclick="adminConfirmRemove('${p.id}','${p.road}')">🗑 Confirm Remove</button>`
+          : `<span style="font-size:10px;color:var(--tx-3)">Engineer/Admin only</span>`}
+      </td>
+    </tr>`;
+  });
+}
+
+function adminIssueRepair(id, road) {
+  toast(`🔧 Repair order issued for ${road} — team notified`, 'safe');
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    App.db.collection('potholes').doc(id).update({ repairOrdered: true, repairOrderedAt: Date.now(), repairedBy: App.adminRole });
+  }
+}
+
+function adminMarkFixed(id, road) {
+  // Mark as pendingRemoval — does NOT delete yet. Engineer/Admin must confirm.
+  const p = App.potholes.find(x => x.id === id);
+  if (p) { p.pendingRemoval = true; p.severity = 'Fixed'; p.risk = 0; p.fixedBy = App.adminRole; p.fixedAt = Date.now(); }
+  idbSavePotholes(App.potholes).catch(() => {});
+
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    App.db.collection('potholes').doc(id).update({
+      pendingRemoval: true, severity: 'Fixed', risk: 0,
+      fixedAt: Date.now(), fixedBy: App.adminRole
+    });
+    toast(`✅ ${road} marked Fixed — awaiting removal confirmation`, 'safe');
+  } else if (!DEMO_MODE) {
+    toast(`⚠️ Offline — saved locally. Confirm online.`, 'warn');
+  } else {
+    toast(`✅ ${road} marked Fixed (Demo Mode)`, 'safe');
+  }
+  refreshAdminTable();
+  refreshPendingRemoval();
+  refreshMapMarkers();
+  refreshInsights();
+  refreshAdminStats();
+}
+
+async function adminConfirmRemove(id, road) {
+  // PERMANENTLY delete from Firebase — pothole disappears everywhere
+  if (!confirm(`Permanently remove "${road}" from the database? This confirms the road is repaired and cannot be undone.`)) return;
+
+  // Remove from local array first
+  App.potholes = App.potholes.filter(p => p.id !== id);
+  idbSavePotholes(App.potholes).catch(() => {});
+
+  if (!DEMO_MODE && navigator.onLine && App.db) {
+    try {
+      await App.db.collection('potholes').doc(id).delete();
+      toast(`🗑️ "${road}" permanently removed from database`, 'safe');
+    } catch(e) {
+      toast(`⚠️ Delete failed — try again when online`, 'warn');
+      console.error('[SaveLYF] Delete failed:', e);
+    }
+  } else {
+    toast(`🗑️ "${road}" removed from device`, 'safe');
+  }
+
+  refreshAdminTable();
+  refreshPendingRemoval();
+  refreshMapMarkers();
+  refreshInsights();
+  refreshAdminStats();
+  refreshHazardList();
+}
+
+function refreshAccidentList() {
+  const al = document.getElementById('acc-list');
+  if (!al) return;
+  al.innerHTML = '';
+
+  // Show real accident-flagged potholes + static ACCIDENT_DATA
+  const accPotholes = App.potholes.filter(p => p.isAccident);
+  const combined = [...ACCIDENT_DATA, ...accPotholes.map(p => ({
+    lat: p.lat, lng: p.lng, road: p.road,
+    time: p.createdAt ? new Date(p.createdAt).toLocaleTimeString('en-BW',{hour:'2-digit',minute:'2-digit'}) : '–',
+    sev: p.severity === 'Dangerous' ? 'Serious' : 'Minor'
+  }))].slice(0, 10);
+
+  const col = s => s==='Serious'?'var(--danger)':'var(--warn)';
+  if (combined.length === 0) {
+    al.innerHTML = '<div style="padding:12px 16px;color:var(--tx-3);font-size:12px">No accident reports in past 24h</div>';
+    return;
+  }
+  combined.forEach(a => {
+    al.innerHTML += `<div class="acc-row">
+      <span class="acc-time">${a.time}</span>
+      <span class="acc-road">${a.road}</span>
+      <span class="acc-sev" style="color:${col(a.sev)}">${a.sev}</span>
+      <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="focusAccident(${a.lat},${a.lng},'${a.road}')">View</button>
+    </div>`;
+  });
+}
+
+function focusAccident(lat, lng, road) {
+  if (App.map && lat && lng) {
+    goPage('dashboard','nav-map');
+    setTimeout(() => {
+      App.map.setView([lat, lng], 16);
+      toast('📍 Viewing: ' + road, 'warn');
+    }, 200);
+  }
+}
+
+function adminEmailReport() {
+  const urgent = App.potholes.filter(p => (p.risk||0) >= 80 && !p.fixed).length;
+  const total  = App.potholes.filter(p => !p.fixed).length;
+  const subject = encodeURIComponent('SaveLYF Road Report — ' + new Date().toLocaleDateString());
+  const body    = encodeURIComponent(
+    'Road Safety Report — SaveLYF System\n' +
+    'Generated: ' + new Date().toLocaleString() + '\n\n' +
+    'Active Hazards: ' + total + '\n' +
+    'Urgent (Risk 80+): ' + urgent + '\n\n' +
+    'Please log into the SaveLYF Admin Portal for the full priority queue.'
+  );
+  window.location.href = `mailto:roads@gov.bw?subject=${subject}&body=${body}`;
+}
+
+function exportCSV() {
+  const header = 'Road Name,Location,Severity,Reports,Risk Score,Status\n';
+  const rows = App.potholes.map(p =>
+    `"${p.road}","Gaborone","${p.fixed?'Fixed':p.severity}",${p.reports||0},${p.risk||0},"${p.fixed?'Fixed':'Active'}"`
+  ).join('\n');
+  const blob = new Blob([header+rows], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'SaveLYF_Road_Report_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('⬇ CSV exported successfully','safe');
+}
+
+/* ══════════════════════════════════════════
+   UTILITIES
+   ══════════════════════════════════════════ */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Update the GPS status pill to show sync state and pending offline actions
+async function updateSyncBadge() {
+  const el  = document.getElementById('gps-acc-txt');
+  if (!el) return;
+
+  const isOnline = navigator.onLine;
+  if (!isOnline) {
+    // Show how many actions are pending sync
+    const queue = await idbGetQueue().catch(() => []);
+    const pending = queue.length;
+    const age = App.syncedAt
+      ? Math.round((Date.now() - App.syncedAt) / 60000) + 'm ago'
+      : 'never';
+    el.textContent = pending > 0
+      ? `OFFLINE · ${pending} pending · synced ${age}`
+      : `OFFLINE · cached ${age}`;
+  } else if (App.syncedAt) {
+    el.textContent = `±${Math.round(App.gps.accuracy || 99)}m · synced`;
+  }
+}
+
+function updateClock() {
+  const n = new Date();
+  document.getElementById('sb-time').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+
+function toast(msg, type='brand') {
+  const colors = { brand:'rgba(41,121,255,.28)', safe:'rgba(0,200,83,.28)', danger:'rgba(255,23,68,.28)', warn:'rgba(255,179,0,.28)' };
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.borderColor = colors[type] || colors.brand;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  if (wrap.children.length > 3) wrap.removeChild(wrap.firstChild);
+  setTimeout(() => { el.classList.add('toast-fade'); setTimeout(() => el.remove(), 300); }, 4000);
+}
+
+/* ══════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
